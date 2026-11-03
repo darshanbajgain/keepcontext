@@ -19,6 +19,7 @@ app.delete('/_fail/:r', (req, res) => { failing.delete(req.params.r); setPushed(
 app.use((req, res, next) => { if (req.headers.authorization !== 'Bearer ghtest') return res.status(401).json({ message: 'bad' }); next(); });
 app.use('/repos/:o/:r/commits', (req, res, next) => failing.has(req.params.r) ? res.status(500).json({ message: 'Server Error' }) : next());
 app.get('/users/:u/repos', (req, res) => res.json(repos.filter(r => !r.private)));
+app.get('/user', (req, res) => res.json({ login: 'alexdev' }));
 app.get('/user/repos', (req, res) => res.json(repos));
 app.get('/repos/:o/empty/commits', (req, res) => res.status(409).json({ message: 'Git Repository is empty.' }));
 app.get('/repos/:o/:r/commits', (req, res) => {

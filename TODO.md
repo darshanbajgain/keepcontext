@@ -2,9 +2,9 @@
 
 ## Before the first public release (1.0.0)
 
-- [ ] **First-run setup page:** set a password and get a generated token in the browser, so no `.env` is needed.
-- [ ] **GitHub optional everywhere:** the hub works as pure memory without a GitHub token.
-- [ ] **Demo mode** (`DEMO=1`) with a fictional person, for screenshots and trying it out.
+- [x] **First-run setup page:** setup code from the log, password, timezone; the admin token is generated and shown once. No `.env` needed.
+- [x] **GitHub optional everywhere**, and **Connect GitHub** in the Settings tab (pre-filled read-only token link).
+- [x] **Demo mode** (`DEMO=1`) with a fictional person, for screenshots and trying it out.
 - [ ] **Docker:** non-root user, `HEALTHCHECK`, OCI labels; multi-arch image on GitHub Container Registry on every release; compose file.
 - [ ] **Docs:** README with screenshots and a 3-step quick start, self-hosting guides (Docker, VPS, home server), security model.
 - [ ] **Community files:** LICENSE (AGPL-3.0), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, Dependabot, CodeQL.

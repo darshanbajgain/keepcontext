@@ -19,6 +19,14 @@
     const err = new URLSearchParams(location.search).get('error');
     if (err === 'locked') document.getElementById('err').textContent = 'Too many failed attempts. Try again in 15 minutes.';
     if (err) document.getElementById('err').hidden = false;
+    fetch('/healthz').then((r) => r.json()).then((h) => {
+      if (!h.demo) return;
+      const p = document.createElement('p');
+      p.className = 'muted small';
+      p.textContent = `Demo mode: all data is made up. Password: ${h.demoPassword}`;
+      document.querySelector('form').insertBefore(p, document.querySelector('form button'));
+      document.querySelector('input[name=password]').value = h.demoPassword;
+    }).catch(() => {});
   </script>
 </body>
 </html>

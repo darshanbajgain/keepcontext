@@ -12,6 +12,7 @@
   <div class="brand"><span class="logo" aria-hidden="true">◆</span> KeepContext <span class="muted" id="owner"></span></div>
   <div class="sync">
     <span class="muted" id="lastSync">Last sync: —</span>
+    <button class="link" id="connectGh" data-goto="settings" hidden>Connect GitHub</button>
     <button class="link bad" id="syncErr" data-goto="activity" hidden></button>
     <button id="syncBtn">Sync GitHub</button>
     <form method="post" action="/logout"><button class="ghost" type="submit">Sign out</button></form>
@@ -26,6 +27,7 @@
   <button data-tab="projects">Projects</button>
   <button data-tab="connect">Apps</button>
   <button data-tab="repo">Repo files</button>
+  <button data-tab="settings">Settings</button>
 </nav>
 
 <main>
@@ -33,6 +35,10 @@
 
   <!-- OVERVIEW -->
   <section id="tab-overview" class="tab">
+    <div class="card getstarted" id="getStarted" hidden>
+      <h2>Get started</h2>
+      <ol class="steps" id="gsSteps"></ol>
+    </div>
     <div class="stats" id="stats"></div>
     <div class="grid2">
       <div class="card">
@@ -147,6 +153,7 @@
           <label class="check"><input type="checkbox" id="showContext" checked> Context and task rows</label>
           <label class="check"><input type="checkbox" id="onlyUnlogged"> Only rows not yet in my work log</label>
           <button class="ghost" id="copyRows">Copy as table</button>
+          <button class="ghost" id="csvRows">Download CSV</button>
           <button class="ghost" id="markLogged">Mark shown as logged</button>
         </div>
       </div>
@@ -214,6 +221,51 @@
       </div>
       <p class="muted">Or from inside a local clone: <code>HUB_URL=… HUB_TOKEN=… npm run inject -- /path/to/repo</code></p>
       <div id="repoFiles"></div>
+    </div>
+  </section>
+  <!-- SETTINGS -->
+  <section id="tab-settings" class="tab" hidden>
+    <div class="grid2">
+      <form class="card" id="profileForm">
+        <h2>Profile</h2>
+        <label>Your name <input name="ownerName" placeholder="Shown to your AI apps, e.g. Alex"></label>
+        <label>Timezone (for activity-log dates) <input name="timezone" placeholder="e.g. Europe/Berlin"></label>
+        <p class="muted small" id="profileEnv" hidden>Some of these are set in <code>.env</code>, which wins; change them there.</p>
+        <button type="submit">Save</button>
+      </form>
+      <div class="card" id="githubCard">
+        <h2>GitHub <span class="muted small">(optional, read-only)</span></h2>
+        <div id="ghConnected" hidden>
+          <p>Connected as <strong id="ghLogin"></strong>. Your repos, commits and pull requests sync every few minutes. KeepContext never writes to GitHub.</p>
+          <div class="row"><button type="button" id="ghSync">Sync now</button><button type="button" class="ghost" id="ghDisconnect">Disconnect</button></div>
+        </div>
+        <form id="ghForm" hidden>
+          <p class="muted">Adds your repos, commits and pull requests to the activity log and the Projects tab.</p>
+          <ol class="steps">
+            <li><a class="button" id="ghTokenLink" target="_blank" rel="noopener noreferrer">Create a read-only token on GitHub ↗</a>
+              <div class="muted small">The permissions are filled in. Under <strong>Repository access</strong> choose <strong>All repositories</strong> (or pick some), then <strong>Generate token</strong> and copy it.</div></li>
+            <li><label>Paste the token <input name="token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+              <button type="submit">Connect</button></li>
+          </ol>
+        </form>
+        <p class="muted small" id="ghEnv" hidden><code>GITHUB_TOKEN</code> is set in <code>.env</code>.</p>
+      </div>
+    </div>
+    <div class="grid2">
+      <form class="card" id="pwForm">
+        <h2>Password</h2>
+        <label>Current password <input name="current" type="password" autocomplete="current-password" required></label>
+        <label>New password <input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <button type="submit">Change password</button>
+        <p class="muted small">Changing it signs out every browser.</p>
+      </form>
+      <div class="card">
+        <h2>Admin token</h2>
+        <p class="muted">For scripts and the REST API (<code>Authorization: Bearer …</code>). AI apps should use their own connection from the Apps tab instead.</p>
+        <button type="button" class="ghost" id="rotateAdmin">Make a new admin token</button>
+        <div class="token-box" id="adminTokenBox" hidden><code id="adminToken"></code></div>
+        <p class="muted small" id="adminEnv" hidden><code>HUB_TOKEN</code> is set in <code>.env</code>; change it there.</p>
+      </div>
     </div>
   </section>
   <datalist id="repoList"></datalist>

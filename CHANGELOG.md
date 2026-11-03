@@ -16,3 +16,7 @@ First public version.
 - **Google Doc mirror** (optional) of your public context for Drive-connected apps.
 - **Security:** hashed connection tokens, private entries never over the secret URL, rate limits, read-only GitHub.
 - Backup and restore scripts, end-to-end tests against a fake GitHub and a fake Google.
+- **First-run setup:** no `.env` needed. Open the hub, enter the setup code from the server log, choose a password and timezone; the admin token is created and shown once. A **Get started** checklist on the Overview.
+- **Settings tab:** name, timezone, password, a new admin token, and **Connect GitHub** (opens GitHub with a read-only token pre-filled; paste it back). Values in `.env` still win.
+- **Demo mode** (`DEMO=1`): a fictional person with entries from several apps, a handed-off task and GitHub-like activity.
+- **Work log CSV** download in the Activity log.

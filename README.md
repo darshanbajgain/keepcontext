@@ -19,12 +19,16 @@ KeepContext is a small Node app with a web UI and one MCP server that Claude (we
 Node 22.13 or newer:
 
 ```bash
-cp .env.example .env     # set HUB_TOKEN (openssl rand -hex 32); GITHUB_TOKEN is optional
 npm install
-npm start                # http://localhost:8787
+npm start                # prints a setup code, then open http://localhost:8787
 ```
 
-Then open the **Apps** tab to connect your AI apps ([docs/CONNECT_APPS.md](docs/CONNECT_APPS.md)).
+The setup page asks for that code, a password and your timezone, and creates your admin token. Then:
+
+1. **Apps** tab: connect your AI apps ([docs/CONNECT_APPS.md](docs/CONNECT_APPS.md)).
+2. **Settings** tab (optional): **Connect GitHub** opens GitHub with a read-only token already filled in; paste it back.
+
+No `.env` is needed; every setting in [.env.example](.env.example) is optional and wins over the UI. To look around first: `DEMO=1 npm start` fills the hub with a fictional person.
 
 ## Docs
 

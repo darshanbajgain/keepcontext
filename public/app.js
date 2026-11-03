@@ -83,7 +83,7 @@ function show(tab) {
   $$('.tab').forEach((s) => (s.hidden = s.id !== `tab-${tab}`));
   try { localStorage.setItem('tab', tab); } catch {}
   window.scrollTo({ top: 0 });
-  ({ overview: loadOverview, context: loadContext, tasks: loadTasks, activity: loadActivity, projects: loadProjects, connect: () => { loadApps(); loadConnect(); }, repo: () => {} })[tab]?.();
+  ({ overview: loadOverview, context: loadContext, tasks: loadTasks, activity: loadActivity, projects: loadProjects, connect: () => { loadApps(); loadConnect(); }, repo: () => {}, settings: loadSettings })[tab]?.();
 }
 $$('.tabs button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
 document.addEventListener('click', (ev) => { const g = ev.target.closest('[data-goto]'); if (g) show(g.dataset.goto); });
@@ -97,7 +97,10 @@ async function loadStatus() {
   $('#tz').textContent = status.timezone;
   $('#lastSync').textContent = status.lastSyncAt ? `Last sync: ${ago(status.lastSyncAt)}` : 'Never synced';
   $('#lastSync').title = status.lastSyncAt ? new Date(status.lastSyncAt).toLocaleString() : '';
-  if (!status.githubConfigured) $('#lastSync').textContent = 'GITHUB_TOKEN not set';
+  // Demo mode has made-up GitHub activity but no GitHub connection.
+  $('#lastSync').hidden = !(status.githubConfigured || status.demo);
+  $('#syncBtn').hidden = !status.githubConfigured;
+  $('#connectGh').hidden = status.githubConfigured || status.demo;
   showSyncErr(status.sync);
   showGdoc(status.gdoc);
   const repos = await api('/projects?all=1');
@@ -128,10 +131,70 @@ $('#syncBtn').addEventListener('click', async () => {
   b.disabled = false; b.textContent = 'Sync GitHub';
 });
 
+/* ---------- settings ---------- */
+async function loadSettings() {
+  const s = await api('/settings');
+  const pf = $('#profileForm');
+  pf.ownerName.value = s.ownerName || ''; pf.ownerName.disabled = s.fromEnv.ownerName;
+  pf.timezone.value = s.timezone || ''; pf.timezone.disabled = s.fromEnv.timezone;
+  $('#profileEnv').hidden = !(s.fromEnv.ownerName || s.fromEnv.timezone);
+  $('#ghConnected').hidden = !s.github.connected;
+  $('#ghForm').hidden = s.github.connected || s.fromEnv.githubToken;
+  $('#ghLogin').textContent = s.github.login ? `@${s.github.login}` : 'your account';
+  $('#ghDisconnect').hidden = s.fromEnv.githubToken;
+  $('#ghEnv').hidden = !s.fromEnv.githubToken;
+  $('#ghTokenLink').href = s.github.tokenUrl;
+  $('#pwForm').hidden = s.fromEnv.password;
+  $('#rotateAdmin').hidden = s.fromEnv.hubToken;
+  $('#adminEnv').hidden = !s.fromEnv.hubToken;
+}
+const settingsAction = (fn) => async (ev) => {
+  ev.preventDefault?.();
+  try { await fn(ev); } catch (e) { toast(e.message, true); }
+};
+$('#profileForm').addEventListener('submit', settingsAction(async (ev) => {
+  const f = ev.target;
+  await api('/settings', { method: 'PATCH', body: { ownerName: f.ownerName.value, timezone: f.timezone.value } });
+  toast('Saved'); await loadStatus();
+}));
+$('#ghForm').addEventListener('submit', settingsAction(async (ev) => {
+  const s = await api('/settings/github', { method: 'POST', body: { token: ev.target.token.value } });
+  ev.target.token.value = '';
+  toast(`Connected as @${s.github.login}. Syncing…`);
+  await loadSettings(); await loadStatus();
+  $('#syncBtn').click();
+}));
+$('#ghSync').addEventListener('click', () => $('#syncBtn').click());
+$('#ghDisconnect').addEventListener('click', settingsAction(async () => {
+  if (!confirm('Disconnect GitHub? Synced repos and activity stay; new activity stops syncing. Delete the token on GitHub too.')) return;
+  await api('/settings/github', { method: 'DELETE' });
+  toast('GitHub disconnected'); await loadSettings(); await loadStatus();
+}));
+$('#pwForm').addEventListener('submit', settingsAction(async (ev) => {
+  await api('/settings/password', { method: 'POST', body: { current: ev.target.current.value, password: ev.target.password.value } });
+  location.reload();
+}));
+$('#rotateAdmin').addEventListener('click', settingsAction(async () => {
+  if (!confirm('Make a new admin token? The old one stops working at once (scripts and apps using it need the new one).')) return;
+  const { token } = await api('/settings/admin-token', { method: 'POST' });
+  $('#adminToken').textContent = token; $('#adminTokenBox').hidden = false;
+  toast('New admin token: shown once, copy it now');
+}));
+
 /* ---------- overview ---------- */
 const ACTION = { added: 'added', updated: 'updated', done: 'marked done', reopened: 'reopened', archived: 'archived', pinned: 'pinned', unpinned: 'unpinned', deleted: 'deleted' };
 async function loadOverview() {
   const o = await api('/overview');
+  // First steps for a new hub; hidden once apps are connected and GitHub is connected (or skipped).
+  let skipGh = false; try { skipGh = localStorage.getItem('skipGithub') === '1'; } catch {}
+  const steps = [
+    { done: o.apps.length > 0, html: 'Connect your AI apps: <button class="link" data-goto="connect">Apps tab →</button> (one connection per app and account)' },
+    { done: status.githubConfigured || skipGh, html: 'Optional: connect GitHub for an activity log of your repos: <button class="link" data-goto="settings">Settings →</button> <button class="link muted" id="skipGh">skip</button>' },
+    { done: o.apps.length > 0 && !!o.byApp.find((a) => a.slug !== 'web'), html: 'Ask any connected app to "save an idea to KeepContext", then see it here.' },
+  ];
+  $('#getStarted').hidden = status.demo || steps.every((s) => s.done);
+  $('#gsSteps').innerHTML = steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? '✓ ' : ''}${s.html}</li>`).join('');
+  $('#skipGh')?.addEventListener('click', () => { try { localStorage.setItem('skipGithub', '1'); } catch {} loadOverview(); });
   const c = (k, s = 'open') => o.counts[k]?.[s] || 0;
   const tiles = [
     ['Open todos', c('todo'), 'todo'], ['Ideas', c('idea'), 'idea'], ['Notes', c('note'), 'note'],
@@ -391,6 +454,16 @@ $('#copyRows').addEventListener('click', async () => {
   const md = ['| Date | Repo | Type | Summary |', '| --- | --- | --- | --- |',
     ...rows.map((r) => `| ${r.date} | ${r.repo} | ${r.type} | ${r.summary.replace(/\|/g, '/')} |`)].join('\n');
   try { await navigator.clipboard.writeText(md); toast(`Copied ${rows.length} GitHub rows`); } catch { toast('Clipboard blocked by the browser', true); }
+});
+$('#csvRows').addEventListener('click', () => {
+  const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [['Date', 'Repo', 'Type', 'Summary', 'URL'], ...logRows().map((r) => [r.date, r.repo, r.type, r.summary, r.url || ''])]
+    .map((row) => row.map(cell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `work-log-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 $('#markLogged').addEventListener('click', async () => {
   const keys = logRows().filter((r) => !r.logged).map((r) => r.key);

@@ -10,6 +10,11 @@ import { syncGithub } from './github.js';
 import { buildMcpServer } from './mcp.js';
 import { gdocStatus, pushGdoc, startGdocMirror } from './gdoc.js';
 import { limiter } from './ratelimit.js';
+import * as S from './settings.js';
+import { seedDemo, DEMO_PASSWORD } from './demo.js';
+
+const DEMO = process.env.DEMO === '1';
+if (DEMO && seedDemo()) console.log('Demo mode: filled the hub with fictional data.');
 
 const app = express();
 app.disable('x-powered-by');
@@ -21,19 +26,18 @@ const safeEq = (a, b) => {
   const x = Buffer.from(String(a)); const y = Buffer.from(String(b));
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 };
-const sessionValue = crypto.createHmac('sha256', config.adminPassword).update('ui-session:' + config.hubToken).digest('hex');
 const getCookie = (req, name) => (req.headers.cookie || '').split(';').map((s) => s.trim().split('='))
   .find(([k]) => k === name)?.[1];
 
 /**
  * Who is calling: { kind: 'admin' | 'app' | 'web', via, app, slug }.
- * - admin: the shared HUB_TOKEN (scripts, old configs). Recorded as "shared-token".
+ * - admin: the admin token (HUB_TOKEN in .env, or the one made by the setup page). Recorded as "shared-token".
  * - app:   a connection token (one per app and account). Recorded as the connection's slug.
  * - web:   the browser session cookie. Recorded as "web".
  */
 function callerForToken(token, via) {
   if (!token) return null;
-  if (safeEq(token, config.hubToken)) return { kind: 'admin', via, app: null, slug: 'shared-token' };
+  if (S.isAdminToken(token)) return { kind: 'admin', via, app: null, slug: 'shared-token' };
   const app = ctx.findAppByToken(token);
   if (!app) return null;
   ctx.touchApp(app.id);
@@ -44,7 +48,7 @@ function resolveCaller(req) {
   if (h.startsWith('Bearer ')) return callerForToken(h.slice(7).trim(), 'bearer');
   if (req.headers['x-hub-token']) return callerForToken(String(req.headers['x-hub-token']).trim(), 'x-hub-token');
   const c = getCookie(req, 'hub_session');
-  return c && safeEq(c, sessionValue) ? { kind: 'web', via: 'cookie', app: null, slug: 'web' } : null;
+  return c && !S.setupNeeded() && safeEq(c, S.sessionValue()) ? { kind: 'web', via: 'cookie', app: null, slug: 'web' } : null;
 }
 const authed = (req) => !!resolveCaller(req);
 
@@ -85,15 +89,39 @@ app.post('/login', express.urlencoded({ extended: false }), async (req, res) => 
   // Checked before the password, so a guess while blocked tells nothing. Signed-in browsers are unaffected.
   if (loginFailsIp.blocked(req.ip) || loginFailsAll.blocked('all')) return res.redirect(303, '/?error=locked');
   const pw = req.body?.password || '';
-  if (!safeEq(pw, config.adminPassword)) {
+  if (!S.isAdminPassword(pw)) {
     loginFailsIp.hit(req.ip);
     loginFailsAll.hit('all');
     await new Promise((r) => setTimeout(r, 800));
     return res.redirect('/?error=1');
   }
-  const secure = req.secure ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `hub_session=${sessionValue}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}${secure}`);
+  setSession(req, res);
   res.redirect('/');
+});
+function setSession(req, res) {
+  const secure = req.secure ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `hub_session=${S.sessionValue()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}${secure}`);
+}
+
+/* ---------- first-run setup: until it's done, only the setup page works ---------- */
+app.use((req, res, next) => {
+  if (!S.setupNeeded()) return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/mcp')) {
+    return res.status(503).json({ error: `Finish the first-run setup first: open ${config.publicUrl} in a browser.` });
+  }
+  next();
+});
+app.post('/setup', async (req, res) => {
+  if (!S.setupNeeded()) return res.status(409).json({ error: 'Setup is already done. Sign in instead.' });
+  if (loginFailsIp.blocked(req.ip)) return tooMany(res, loginFailsIp.blocked(req.ip));
+  try {
+    const { token } = S.completeSetup(req.body || {});
+    setSession(req, res);
+    res.json({ token });
+  } catch (e) {
+    if (/setup code/.test(e.message)) loginFailsIp.hit(req.ip);
+    res.status(400).json({ error: e.message });
+  }
 });
 app.post('/logout', (req, res) => {
   res.setHeader('Set-Cookie', 'hub_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
@@ -154,11 +182,20 @@ const wrap = (fn) => async (req, res) => {
   try { res.json(await fn(req, res)); } catch (e) { res.status(400).json({ error: e.message }); }
 };
 
+// Settings tab (admin and web only: connection tokens can't reach anything outside /entries and /context).
+api.get('/settings', wrap(() => S.publicSettings()));
+api.patch('/settings', wrap((req) => S.updateSettings(req.body || {})));
+api.post('/settings/github', wrap((req) => S.connectGithub(req.body?.token)));
+api.delete('/settings/github', wrap(() => S.disconnectGithub()));
+api.post('/settings/password', wrap((req) => S.changePassword(req.body || {})));
+api.post('/settings/admin-token', wrap(() => S.rotateAdminToken()));
+
 api.get('/status', wrap(() => ({
   owner: config.ownerName,
   version: config.version,
   githubOwner: kvGet('github_owner'),
   githubConfigured: !!config.github.token,
+  demo: DEMO,
   lastSyncAt: kvGet('last_sync_at'),
   timezone: config.timezone,
   publicUrl: config.publicUrl,
@@ -214,20 +251,24 @@ app.use('/api', api);
 
 /* ---------- web UI ---------- */
 const pub = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
-app.get('/healthz', (req, res) => res.json({ ok: true }));
+// demo: lets the login page show the demo password (demo mode only; a real hub never says this).
+app.get('/healthz', (req, res) => res.json(DEMO ? { ok: true, demo: true, demoPassword: DEMO_PASSWORD } : { ok: true }));
 // Public helper script (no secrets): curl -fsSL <hub>/connect.sh | bash -s <app>
 app.get('/connect.sh', (req, res) => res.type('text/x-shellscript').set('Cache-Control', 'no-store').send(ctx.connectScript()));
-app.get('/', (req, res) => res.sendFile(path.join(pub, authed(req) ? 'index.html' : 'login.html')));
+app.get('/', (req, res) => res.sendFile(path.join(pub, S.setupNeeded() ? 'setup.html' : authed(req) ? 'index.html' : 'login.html')));
 app.use(express.static(pub, { index: false }));
 
 app.listen(config.port, () => {
   console.log(`KeepContext on ${config.publicUrl}  (MCP: ${config.publicUrl}/mcp)`);
+  const code = S.setupCodeForLog();
+  if (code) console.log(`\nFirst-run setup: open ${config.publicUrl} and enter the setup code ${code}\n`);
   if (startGdocMirror()) console.log('Google Doc mirror on');
 });
 
-if (config.autoSyncMinutes > 0 && config.github.token) {
+if (config.autoSyncMinutes > 0) {
   // Idle runs cost ~2 GitHub calls, so a few minutes is fine. Only log when something happened.
-  const run = () => syncGithub().then((r) => {
+  // GitHub can be connected later in the Settings tab, so each run checks for a token.
+  const run = () => config.github.token && syncGithub().then((r) => {
     if (r.reposChanged.length) console.log('auto-sync', { changed: r.reposChanged, newCommits: r.newCommits, prs: r.prsTouched });
     if (r.errors.length) console.error('auto-sync errors', r.errors);
   }, (e) => console.error('auto-sync failed', e.message));

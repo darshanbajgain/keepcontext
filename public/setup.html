@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KeepContext setup</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Cpath d=%27M8 1l7 7-7 7-7-7z%27 fill=%27%233157d5%27/%3E%3C/svg%3E">
+</head>
+<body class="login">
+  <form id="setup" class="card login-card setup-card">
+    <h1>Welcome to KeepContext</h1>
+    <p class="muted">One memory for all your AI apps. Set it up in a minute: everything stays on this server.</p>
+    <label>Setup code <input name="code" required autocomplete="off" autofocus placeholder="from the server log"></label>
+    <p class="muted small">Printed when the server started (<code>docker logs keepcontext</code>, or the terminal running <code>npm start</code>), so only you can finish setup.</p>
+    <label>Your name (optional) <input name="ownerName" autocomplete="name" placeholder="Shown to your AI apps, e.g. Alex"></label>
+    <label>Timezone <input name="timezone" id="tz" required></label>
+    <label>Password <input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+    <label>Password again <input type="password" name="password2" required minlength="8" autocomplete="new-password"></label>
+    <p class="error" id="err" hidden></p>
+    <button type="submit">Finish setup</button>
+  </form>
+
+  <div id="done" class="card login-card setup-card" hidden>
+    <h1>You're set up</h1>
+    <p>Your <strong>admin token</strong> is below. It's shown only this once. Keep it in a password manager: scripts and the REST API use it.</p>
+    <div class="token-box"><code id="token"></code><button type="button" class="ghost sm" id="copy">Copy</button></div>
+    <p class="muted small">You don't need it to connect your AI apps: the <strong>Apps</strong> tab gives each app its own token.</p>
+    <a class="button" href="/">Open KeepContext →</a>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    try { $('#tz').value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { $('#tz').value = 'UTC'; }
+    const fail = (msg) => { $('#err').textContent = msg; $('#err').hidden = false; };
+    $('#setup').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = Object.fromEntries(new FormData(ev.target));
+      if (f.password !== f.password2) return fail('The two passwords are different.');
+      $('#err').hidden = true;
+      const btn = ev.target.querySelector('button'); btn.disabled = true;
+      try {
+        const r = await fetch('/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: f.code, ownerName: f.ownerName, timezone: f.timezone, password: f.password }) });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || `Setup failed (HTTP ${r.status})`);
+        $('#token').textContent = data.token;
+        $('#setup').hidden = true; $('#done').hidden = false;
+      } catch (e) { fail(e.message); }
+      btn.disabled = false;
+    });
+    $('#copy').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText($('#token').textContent); $('#copy').textContent = 'Copied'; } catch { $('#copy').textContent = 'Select and copy'; }
+    });
+  </script>
+</body>
+</html>

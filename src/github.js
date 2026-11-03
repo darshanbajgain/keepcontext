@@ -2,6 +2,7 @@
 // Read-only: it never writes to GitHub.
 import { config } from './config.js';
 import { db, now, kvGet, kvSet, notifyChange } from './db.js';
+import './settings.js'; // a token connected in the Settings tab fills in config.github
 
 const API = (process.env.GITHUB_API_URL || 'https://api.github.com').replace(/\/$/, '');
 
@@ -48,7 +49,7 @@ export function syncGithub() {
 }
 
 async function doSync() {
-  if (!config.github.token) throw new Error('GITHUB_TOKEN is not set. Add a read-only token in .env.');
+  if (!config.github.token) throw new Error('GitHub is not connected. Connect it in the Settings tab (or set GITHUB_TOKEN in .env).');
   const startedAt = now();
   const runId = db.prepare('INSERT INTO sync_runs(started_at) VALUES(?)').run(startedAt).lastInsertRowid;
   const summary = { repos: 0, reposChanged: [], newCommits: 0, prsTouched: 0, errors: [] };

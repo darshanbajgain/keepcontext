@@ -8,8 +8,16 @@ const KINDS = ['idea', 'note', 'instruction', 'decision', 'todo', 'profile'];
 export { KINDS };
 
 /* ---------- dates ---------- */
-const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
-export const localDay = (iso) => (iso ? dayFmt.format(new Date(iso)) : '');
+// The timezone can change in the Settings tab, so the formatter follows config.timezone.
+let dayFmt = null, dayTz = null;
+export const localDay = (iso) => {
+  if (!iso) return '';
+  if (dayTz !== config.timezone) {
+    dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    dayTz = config.timezone;
+  }
+  return dayFmt.format(new Date(iso));
+};
 
 /* ---------- activity log ---------- */
 function firstLine(msg) {

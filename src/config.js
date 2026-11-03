@@ -25,7 +25,7 @@ export const config = {
   port: Number(env.PORT || 8787),
   // Public base URL, used only to print copy-paste config snippets in the UI.
   publicUrl: (env.PUBLIC_URL || `http://localhost:${env.PORT || 8787}`).replace(/\/$/, ''),
-  // One secret that unlocks the API and the MCP endpoint. Required.
+  // Admin secret for the API and MCP. Optional: without it, the first-run setup page creates one.
   hubToken: env.HUB_TOKEN || '',
   // Password for the web UI. Defaults to HUB_TOKEN.
   adminPassword: env.ADMIN_PASSWORD || env.HUB_TOKEN || '',
@@ -38,9 +38,9 @@ export const config = {
   },
   // Timezone for activity-log dates (an IANA name, e.g. Europe/Berlin).
   timezone: env.TIMEZONE || 'UTC',
-  // Auto-sync every N minutes (0 = off; use the Sync button or POST /api/sync).
+  // Auto-sync every N minutes (default 5; 0 = off, then use the Sync button or POST /api/sync).
   // AUTO_SYNC_MINUTES wins; AUTO_SYNC_HOURS is the older, coarser setting.
-  autoSyncMinutes: Number(env.AUTO_SYNC_MINUTES || 0) || Number(env.AUTO_SYNC_HOURS || 0) * 60,
+  autoSyncMinutes: Number(env.AUTO_SYNC_MINUTES ?? (env.AUTO_SYNC_HOURS ? Number(env.AUTO_SYNC_HOURS) * 60 : 5)),
   // Your name, used in the context bundle and repo files ("Context for Alex"). Optional.
   ownerName: env.OWNER_NAME || '',
   // Which proxies to believe for the client IP (Express "trust proxy"). loopback = a proxy on this machine
@@ -66,7 +66,8 @@ export const config = {
   },
 };
 
-if (!config.hubToken || config.hubToken.length < 16) {
-  console.error('HUB_TOKEN is missing or shorter than 16 characters. Set it in .env (see .env.example).');
+// HUB_TOKEN is optional: without it, the first-run setup page creates one (src/settings.js).
+if (config.hubToken && config.hubToken.length < 16) {
+  console.error('HUB_TOKEN is shorter than 16 characters. Use a long random value (openssl rand -hex 32), or remove it and use the setup page.');
   process.exit(1);
 }

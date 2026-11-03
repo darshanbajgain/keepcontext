@@ -16,7 +16,9 @@ Self-hosted Node app that stores personal context (ideas, notes, decisions, todo
 
 | File | Role |
 | --- | --- |
-| `src/config.js` | Reads env and `.env`; exits if `HUB_TOKEN` is missing |
+| `src/config.js` | Reads env and `.env` (everything optional) |
+| `src/settings.js` | First-run setup, admin password/token, profile and GitHub token set in the UI (stored in `kv`; `.env` wins) |
+| `src/demo.js` | `DEMO=1`: fills an empty hub with a fictional person |
 | `src/db.js` | `node:sqlite` schema (repos, commits, prs, entries, entry_events, apps, tasks, task_checkpoints, logged_events, sync_runs, kv) |
 | `src/github.js` | `syncGithub()`: repos → commits on the default branch since the last sync → PRs updated since then |
 | `src/context.js` | All queries: activity log rows, entries CRUD/search, projects, `contextBundle()`, work log rows, repo context files, continue-anywhere tasks |

@@ -69,7 +69,9 @@ flowchart LR
 
 | Path | Role | Key exports / contents |
 | --- | --- | --- |
-| `src/config.js` | Loads `.env` (tiny built-in loader; real env vars win), builds `config`, exits if `HUB_TOKEN` is missing or shorter than 16 chars | `config` |
+| `src/config.js` | Loads `.env` (tiny built-in loader; real env vars win), builds `config`. Everything is optional; exits only if `HUB_TOKEN` is set but shorter than 16 chars | `config` |
+| `src/settings.js` | Settings made in the UI, stored in `kv`, filled into `config` where `.env` is empty: first-run setup (`setupNeeded()`, `completeSetup()`, setup code), admin password (scrypt) and admin token (SHA-256), session secret, profile (name, timezone), GitHub token (`connectGithub()`, pre-filled token link) | `setupNeeded()`, `completeSetup()`, `isAdminToken()`, `isAdminPassword()`, `sessionValue()`, `updateSettings()`, `connectGithub()`, `disconnectGithub()`, `rotateAdminToken()`, `changePassword()`, `publicSettings()` |
+| `src/demo.js` | `DEMO=1`: completes setup with a demo password and fills an empty hub with a fictional person (entries from several apps, a handed-off task, GitHub-like activity) | `seedDemo()`, `DEMO_PASSWORD` |
 | `src/db.js` | Opens `data/hub.db` with `node:sqlite`, creates tables, runs guarded column migrations, change events | `db`, `now()`, `kvGet()`, `kvSet()`, `changes`, `notifyChange()` |
 | `src/github.js` | GitHub client (`fetch`, pagination via `Link` header) and `syncGithub()` | `syncGithub()` |
 | `src/context.js` | All queries and formatting: activity log (GitHub + context changes), entries CRUD/search with change history, projects, the agent bundle, work log table, repo context files, overview dashboard data, Google Doc content | `activity()`, `workLogRows()`, `markLogged()`, `projects()`, `updateProject()`, `createEntry()`, `updateEntry()`, `deleteEntry()`, `listEntries()`, `contextBundle()`, `repoContextFiles()`, `overview()`, `syncRuns()`, `syncHealth()`, tasks (`startTask()`, `checkpointTask()`, `listTasks()`, `getTask()`, `resumeTask()`, `finishTask()`, `reopenTask()`), `isGithubRow()`, `mirrorModel()`, connections (`APP_PRESETS`, `createApp()`, `listApps()`, `rotateApp()`, `revokeApp()`, `findAppByToken()`, `touchApp()`), `localDay()`, `KINDS` |
@@ -77,10 +79,11 @@ flowchart LR
 | `src/mcp.js` | Builds an MCP server per request and registers the 17 tools (zod input schemas, annotations), including the five task tools | `buildMcpServer({ allowPrivate, caller })` |
 | `src/server.js` | Express app: auth, rate limits, login/logout, MCP routes, REST routes, static UI, auto-sync timer | (entry point) |
 | `src/ratelimit.js` | In-memory fixed-window counters (no dependency) used by `server.js` for failed logins, wrong tokens and requests per app | `limiter({ limit, windowMs })` |
-| `public/index.html` | The single-page UI: 7 tabs (Overview, Context, Tasks, Activity log, Projects, Apps, Repo files) | |
+| `public/index.html` | The single-page UI: 8 tabs (Overview with a Get started checklist, Context, Tasks, Activity log with CSV export, Projects, Apps, Repo files, Settings) | |
 | `public/app.js` | Vanilla JS for the UI: `api()` fetch wrapper, tab loaders, Overview dashboard, entry cards (Markdown details, source badge, show more), client-side filters (search, kind, status, source app, tag chips). Context tab layout: filtered list first, add/edit form in a sticky side column, full-width agent-bundle preview below; Overview metric cards open the matching list, Markdown renderer (`mdToHtml`), `esc()` for escaping | |
 | `public/style.css` | Light/dark theme via CSS variables, layout helpers (`.row`, `.grid2`, `.card`, `.pill`) | |
-| `public/login.html` | Password form posting to `/login` | |
+| `public/login.html` | Password form posting to `/login` (shows the password in demo mode) | |
+| `public/setup.html` | First-run setup form (setup code, name, timezone from the browser, password); shows the admin token once | |
 | `scripts/sync.mjs` | `npm run sync`: one sync from the CLI or cron | |
 | `scripts/backup.sh` | Consistent snapshot of the live database (SQLite `VACUUM INTO`), integrity-checked, newest 14 kept on the VM; `--stdout` for the nightly workflow |
 | `scripts/restore.sh` | Swap a snapshot back in on the server: check it, stop, keep the current DB as pre-restore, start, `/healthz`, undo on failure |
@@ -230,7 +233,7 @@ erDiagram
 | `entry_events` | Every context change: `added`, `updated`, `done`, `reopened`, `archived`, `pinned`, `unpinned`, `deleted`, with who did it (`source`: the app for adds, `web` for UI edits, `agent` for MCP edits) | Snapshots of kind/title/repo/private, so rows stay readable after edits or deletes. Feeds the Context activity rows and the Overview |
 | `tasks` | Continue-anywhere tasks: title, goal, repo, branch (default `wip/<id>-<title>`), status `active` / `done` / `abandoned`, `private`, `created_by` and `owner` (connection slugs) | Private by default when `repo` isn't a synced repo (company work), unless created over the secret URL |
 | `task_checkpoints` | Append-only progress notes per task: app (verified), reason (`start`, `step`, `limit-warning`, `resumed`, `finished`, `abandoned`, `reopened`), summary, JSON lists `done` / `next` / `files` / `decisions` / `questions`, `commit_sha`, `branch` | `resumed` rows mark handoffs (only when the owner changes); they're hidden from the history agents get |
-| `kv` | `last_sync_at`, `github_owner`, `sync_retry` (repos whose last fetch failed → where to fetch from again), `gdoc_last_push_at`, `gdoc_last_hash` | |
+| `kv` | Settings from the UI (`admin_password`, `admin_token_sha256`, `session_secret`, `owner_name`, `timezone`, `github_token`, `github_login`), `last_sync_at`, `github_owner`, `sync_retry` (repos whose last fetch failed → where to fetch from again), `gdoc_last_push_at`, `gdoc_last_hash` | |
 
 **Migrations:** new columns are added in `db.js` with `ALTER TABLE … ADD COLUMN`, guarded by `hasColumn()`, so old `hub.db` files keep working. Never drop or rename columns.
 
@@ -320,12 +323,14 @@ Connections (`apps` table, Apps tab, `/api/apps`, admin-only): tokens are `chub_
 Details:
 
 - Token and password checks use `crypto.timingSafeEqual` (`safeEq`). A failed login waits 800 ms.
+- **First-run setup** (no `HUB_TOKEN` in `.env` and none stored): only `/`, `/setup`, `/healthz` and static files work; `/api` and `/mcp` answer 503. Finishing setup needs the **setup code** printed in the server log (`SETUP_CODE` to fix it), so whoever reaches a freshly exposed hub first can't claim it; wrong codes count as failed logins. The password is stored as scrypt with a salt, the admin token only as SHA-256, both in `kv`.
+- **GitHub token from the UI** is checked against `GET /user` and stored in `kv` (like `.env`, the database file is the secret store; never returned by any route). The Connect link pre-fills a fine-grained token with read-only Contents, Pull requests and Metadata.
 - Rate limits (`src/ratelimit.js`, in memory, reset on restart; `0` turns one off):
   - **Failed logins:** `LOGIN_MAX_FAILS` (10) per IP and `LOGIN_MAX_FAILS_TOTAL` (50) in total per 15 minutes. Checked before the password, so a guess while blocked reveals nothing; the login page says to wait. Browsers already signed in are unaffected.
   - **Wrong tokens or cookies** on `/api`, `/mcp` and `/mcp/k/:token`: `BAD_TOKEN_MAX` (30) per IP per 15 minutes, then `429` with `Retry-After`. A valid token is never refused by this, so guessing from a shared IP can't lock the real apps out.
   - **Requests per caller** (connection slug, `shared-token` or `web`, not IP): `RATE_LIMIT_PER_MINUTE` (600), then `429`. Stops one runaway agent from flooding the hub.
   - The client IP comes from `X-Forwarded-For` only when the connection is from a trusted proxy (`TRUST_PROXY`, default `loopback`: Tailscale Funnel, cloudflared, Caddy on the same machine), so clients can't fake it.
-- The session cookie is stateless: `HMAC-SHA256(ADMIN_PASSWORD, 'ui-session:' + HUB_TOKEN)`, `HttpOnly`, `SameSite=Lax`, 30 days, `Secure` behind HTTPS. Changing either secret signs everyone out.
+- The session cookie is stateless: `HMAC-SHA256(ADMIN_PASSWORD, 'ui-session:' + HUB_TOKEN)` with `.env` secrets, or `HMAC-SHA256(session_secret, 'ui-session:' + password hash)` after the setup page, `HttpOnly`, `SameSite=Lax`, 30 days, `Secure` behind HTTPS. Changing either secret signs everyone out.
 - Private entries: `listEntries()` and `contextBundle()` exclude them unless `includePrivate: true`; `updateEntry()` treats them as missing unless `includePrivate: true`. `canSeePrivate(caller)` decides: the web UI always; the shared token or a connection with private access only over the `Authorization` header.
 - `/api/status` never returns secrets. Nothing logs tokens.
 - GitHub is read-only: only `GET` requests; the token needs read scopes only.
@@ -337,19 +342,21 @@ Details:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `HUB_TOKEN` | required (≥16 chars) | Secret for REST and MCP; part of the secret URL |
-| `ADMIN_PASSWORD` | `HUB_TOKEN` | Web UI password |
-| `GITHUB_TOKEN` | empty | Fine-grained, read-only token. Without it, sync is off |
+| `HUB_TOKEN` | empty (setup page makes one) | Admin secret for REST and MCP (≥16 chars) |
+| `ADMIN_PASSWORD` | `HUB_TOKEN`, else set on the setup page | Web UI password |
+| `SETUP_CODE` | random, printed in the log | Code the first-run setup asks for |
+| `DEMO` | off | `1` fills an empty hub with a fictional person |
+| `GITHUB_TOKEN` | empty (Settings → Connect GitHub) | Fine-grained, read-only token. Without it, sync is off |
 | `GITHUB_OWNER` | token's account | Whose repos to sync |
 | `GITHUB_API_URL` | `https://api.github.com` | Point at the fake GitHub for tests |
 | `SYNC_WINDOW_DAYS` | 60 | First-sync backfill |
-| `AUTO_SYNC_MINUTES` | 0 (off) | Sync interval; wins over `AUTO_SYNC_HOURS` |
+| `AUTO_SYNC_MINUTES` | 5 | Sync interval (0 = off); wins over `AUTO_SYNC_HOURS`. Runs only while GitHub is connected |
 | `AUTO_SYNC_HOURS` | 0 | Older, coarser interval |
 | `INCLUDE_FORKS` | false | Sync forks too |
-| `TIMEZONE` | UTC | Activity-log dates (IANA name) |
+| `TIMEZONE` | UTC (setup page / Settings tab) | Activity-log dates (IANA name) |
 | `PUBLIC_URL` | `http://localhost:PORT` | Shown in Connect snippets and repo files |
 | `PORT` | 8787 | HTTP port |
-| `OWNER_NAME` | empty | Your name in the bundle heading and repo files |
+| `OWNER_NAME` | empty (Settings tab) | Your name in the bundle heading and repo files |
 | `DATA_DIR` | `./data` (`/data` in Docker) | Where `hub.db` lives |
 | `GOOGLE_DOC_ID` | empty (mirror off) | The Doc to keep in sync (the long ID in its URL) |
 | `GOOGLE_SA_KEY_FILE` | `./google-sa.json` | Service-account JSON key; if the file doesn't exist, keyless mode (metadata server) is used |

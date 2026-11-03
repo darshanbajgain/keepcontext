@@ -565,3 +565,96 @@ test('tasks: one app starts, another resumes from the last checkpoint, the first
   for (const c of [a, b, url, urlCreator]) await c.close();
   for (const x of [claude, codex, chat]) await api(`/apps/${x.app.id}`, { method: 'DELETE' });
 });
+
+// A second hub with no HUB_TOKEN in the environment: the first-run setup and the Settings tab.
+async function freshHub(port, env = {}) {
+  const base = `http://localhost:${port}`;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-test-fresh-'));
+  const p = start('src/server.js', {
+    HUB_TOKEN: '', ADMIN_PASSWORD: '', GITHUB_TOKEN: '', GITHUB_OWNER: '', OWNER_NAME: '', TIMEZONE: '',
+    GITHUB_API_URL: `http://localhost:${MOCK_PORT}`, DATA_DIR: dir, PORT: String(port), PUBLIC_URL: base,
+    AUTO_SYNC_MINUTES: '0', GOOGLE_DOC_ID: '', ...env,
+  });
+  await waitFor(`${base}/healthz`);
+  return { base, stop: () => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); } };
+}
+const cookieOf = (r) => (r.headers.get('set-cookie') || '').split(';')[0];
+
+test('first-run setup: setup code, password, generated admin token; then settings and GitHub from the UI', async () => {
+  const { base, stop } = await freshHub(HUB_PORT - 2, { SETUP_CODE: 'C0DE42' });
+  const call = (p, { method = 'GET', body, token, cookie } = {}) => fetch(`${base}${p}`, {
+    method, body: body ? JSON.stringify(body) : undefined,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(cookie ? { Cookie: cookie } : {}) },
+  });
+  try {
+    // Before setup: the page is the setup form; the API and MCP say so.
+    assert.match(await (await fetch(base)).text(), /Welcome to KeepContext/);
+    assert.equal((await call('/api/status')).status, 503);
+    assert.equal((await call('/mcp', { method: 'POST' })).status, 503);
+    assert.match((await (await call('/setup', { method: 'POST', body: { code: 'nope', password: 'long-enough-pw' } })).json()).error, /setup code/);
+    assert.match((await (await call('/setup', { method: 'POST', body: { code: 'c0de42', password: 'short' } })).json()).error, /8 characters/);
+    const done = await call('/setup', { method: 'POST', body: { code: 'c0de42', password: 'long-enough-pw', ownerName: 'Sam', timezone: 'Europe/Berlin' } });
+    assert.equal(done.status, 200);
+    const { token } = await done.json();
+    assert.match(token, /^[0-9a-f]{64}$/);
+    const setupCookie = cookieOf(done);
+    assert.equal((await call('/api/status', { cookie: setupCookie })).status, 200, 'signed in right after setup');
+    assert.equal((await call('/setup', { method: 'POST', body: { code: 'c0de42', password: 'another-password' } })).status, 409);
+
+    // The token, the password and the settings work.
+    const status = await (await call('/api/status', { token })).json();
+    assert.equal(status.owner, 'Sam');
+    assert.equal(status.timezone, 'Europe/Berlin');
+    assert.equal(status.githubConfigured, false);
+    const login = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', body: new URLSearchParams({ password: 'long-enough-pw' }) });
+    assert.equal(login.headers.get('location'), '/');
+    const cookie = cookieOf(login);
+    assert.equal((await call('/api/status', { cookie })).status, 200);
+    assert.match(await (await fetch(base, { headers: { Cookie: cookie } })).text(), /id="tab-settings"/);
+
+    let s = await (await call('/api/settings', { token })).json();
+    assert.equal(s.github.connected, false);
+    assert.match(s.github.tokenUrl, /^https:\/\/github\.com\/settings\/personal-access-tokens\/new\?.*contents=read.*pull_requests=read/);
+    assert.equal((await call('/api/settings', { method: 'PATCH', token, body: { timezone: 'Mars/Olympus' } })).status, 400);
+    s = await (await call('/api/settings', { method: 'PATCH', token, body: { ownerName: 'Sam Lee', timezone: 'Asia/Tokyo' } })).json();
+    assert.equal(s.ownerName, 'Sam Lee');
+    assert.equal((await (await call('/api/status', { token })).json()).timezone, 'Asia/Tokyo');
+
+    // GitHub: a wrong token is refused; the right one connects, syncs, and is never shown back.
+    assert.match((await (await call('/api/settings/github', { method: 'POST', token, body: { token: 'wrong' } })).json()).error, /rejected/);
+    s = await (await call('/api/settings/github', { method: 'POST', token, body: { token: 'ghtest' } })).json();
+    assert.equal(s.github.connected, true);
+    assert.equal(s.github.login, 'alexdev');
+    assert.ok(!JSON.stringify(s).includes('ghtest') && !(await (await call('/api/status', { token })).text()).includes('ghtest'));
+    assert.equal((await (await call('/api/sync', { method: 'POST', token })).json()).repos, 4);
+    assert.equal((await (await call('/api/settings/github', { method: 'DELETE', token })).json()).github.connected, false);
+
+    // New admin token: the old one stops working. New password: old sessions end.
+    const { token: token2 } = await (await call('/api/settings/admin-token', { method: 'POST', token })).json();
+    assert.equal((await call('/api/status', { token })).status, 401);
+    assert.equal((await call('/api/status', { token: token2 })).status, 200);
+    assert.equal((await call('/api/settings/password', { method: 'POST', token: token2, body: { current: 'wrong', password: 'new-password-1' } })).status, 400);
+    assert.equal((await call('/api/settings/password', { method: 'POST', token: token2, body: { current: 'long-enough-pw', password: 'new-password-1' } })).status, 200);
+    assert.equal((await call('/api/status', { cookie })).status, 401, 'old browser sessions are signed out');
+  } finally { stop(); }
+});
+
+test('demo mode: a fictional person with entries from several apps, a handed-off task and GitHub-like activity', async () => {
+  const { base, stop } = await freshHub(HUB_PORT - 3, { DEMO: '1' });
+  try {
+    const h = await (await fetch(`${base}/healthz`)).json();
+    assert.equal(h.demo, true);
+    const login = await fetch(`${base}/login`, { method: 'POST', redirect: 'manual', body: new URLSearchParams({ password: h.demoPassword }) });
+    const cookie = cookieOf(login);
+    const get = async (p) => (await fetch(`${base}/api${p}`, { headers: { Cookie: cookie } })).json();
+    const entries = await get('/entries?limit=100');
+    assert.ok(entries.length >= 8);
+    assert.ok(new Set(entries.map((e) => e.createdBy?.slug)).size >= 4, 'added by several apps');
+    const tasks = await get('/tasks?status=all');
+    const handed = tasks.find((t) => t.status === 'done');
+    assert.deepEqual(handed.chain, ['Claude Code', 'Codex', 'Cursor']);
+    const types = new Set((await get('/activity?days=30')).map((r) => r.type));
+    for (const t of ['Commits', 'PR merged', 'Context', 'Task']) assert.ok(types.has(t), t);
+    assert.equal((await get('/status')).owner, 'Alex Rivera');
+  } finally { stop(); }
+});
