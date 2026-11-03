@@ -4,6 +4,11 @@ All notable changes to KeepContext. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Changed
+
+- The Docker image runs on Node 26 (current LTS); CI tests Node 22, 24 and 26.
+- Dependencies and GitHub Actions updated (MCP SDK 1.32.2, checkout and setup-node v7, Docker build actions).
+
 ## [1.0.1] - 2026-11-04
 
 ### Security
