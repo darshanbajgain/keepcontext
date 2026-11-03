@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "keepcontext": {
+      "type": "http",
+      "url": "${HUB_URL:-http://localhost:8787}/mcp",
+      "headers": { "Authorization": "Bearer ${HUB_TOKEN}" }
+    }
+  }
+}

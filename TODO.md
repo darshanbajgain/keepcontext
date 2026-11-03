@@ -1,0 +1,21 @@
+# Roadmap
+
+## Before the first public release (1.0.0)
+
+- [ ] **First-run setup page:** set a password and get a generated token in the browser, so no `.env` is needed.
+- [ ] **GitHub optional everywhere:** the hub works as pure memory without a GitHub token.
+- [ ] **Demo mode** (`DEMO=1`) with a fictional person, for screenshots and trying it out.
+- [ ] **Docker:** non-root user, `HEALTHCHECK`, OCI labels; multi-arch image on GitHub Container Registry on every release; compose file.
+- [ ] **Docs:** README with screenshots and a 3-step quick start, self-hosting guides (Docker, VPS, home server), security model.
+- [ ] **Community files:** LICENSE (AGPL-3.0), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, Dependabot, CodeQL.
+- [ ] Test the image on a clean machine; tag `v1.0.0`.
+
+## Later
+
+- [ ] OAuth 2.1 for MCP, so web apps sign in instead of using a secret URL.
+- [ ] MCP `resume` prompt and resources (`context://bundle`).
+- [ ] GitHub compare links per task checkpoint; public tasks in the Google Doc mirror.
+- [ ] Better search (SQLite FTS5, then optional embeddings).
+- [ ] More sources (GitLab, other GitHub accounts) and mirrors (Notion, Markdown).
+- [ ] Postgres option behind a small storage interface.
+- [ ] Pagination and inline editing in the UI.

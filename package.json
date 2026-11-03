@@ -1,0 +1,40 @@
+{
+  "name": "keepcontext",
+  "version": "1.0.0",
+  "description": "Self-hosted memory shared by all your AI apps (Claude, ChatGPT, Gemini, Cursor, Codex, Copilot…) over MCP: ideas, decisions, todos, GitHub activity, and tasks any app can continue when another hits its limit.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --no-warnings src/server.js",
+    "dev": "node --no-warnings --watch src/server.js",
+    "sync": "node --no-warnings scripts/sync.mjs",
+    "inject": "node scripts/inject.mjs",
+    "test": "node --no-warnings --test \"test/**/*.test.mjs\"",
+    "mock:github": "node test/mock-github.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^5.1.0",
+    "zod": "^4.1.0"
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darshanbajgain/keepcontext.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "memory",
+    "self-hosted",
+    "claude",
+    "chatgpt",
+    "gemini",
+    "cursor",
+    "codex"
+  ]
+}

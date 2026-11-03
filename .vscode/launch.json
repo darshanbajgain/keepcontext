@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run KeepContext",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/server.js",
+      "runtimeArgs": ["--no-warnings"],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run with fake GitHub",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/server.js",
+      "runtimeArgs": ["--no-warnings"],
+      "env": {
+        "HUB_TOKEN": "dev-token-change-me-1234",
+        "ADMIN_PASSWORD": "dev",
+        "GITHUB_TOKEN": "ghtest",
+        "GITHUB_API_URL": "http://localhost:9911",
+        "GITHUB_OWNER": "alexdev",
+        "DATA_DIR": "${workspaceFolder}/data-dev"
+      },
+      "preLaunchTask": "mock github",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["--no-warnings", "--test", "test/**/*.test.mjs"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

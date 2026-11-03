@@ -1,0 +1,7 @@
+node_modules
+data
+.env
+.git
+data-dev
+google-sa.json
+*-sa.json

@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KeepContext</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Cpath d=%27M8 1l7 7-7 7-7-7z%27 fill=%27%233157d5%27/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true">◆</span> KeepContext <span class="muted" id="owner"></span></div>
+  <div class="sync">
+    <span class="muted" id="lastSync">Last sync: —</span>
+    <button class="link bad" id="syncErr" data-goto="activity" hidden></button>
+    <button id="syncBtn">Sync GitHub</button>
+    <form method="post" action="/logout"><button class="ghost" type="submit">Sign out</button></form>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button data-tab="overview" class="active">Overview</button>
+  <button data-tab="context">Context</button>
+  <button data-tab="tasks">Tasks</button>
+  <button data-tab="activity">Activity log</button>
+  <button data-tab="projects">Projects</button>
+  <button data-tab="connect">Apps</button>
+  <button data-tab="repo">Repo files</button>
+</nav>
+
+<main>
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- OVERVIEW -->
+  <section id="tab-overview" class="tab">
+    <div class="stats" id="stats"></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="row between"><h2>Pinned</h2><button class="ghost sm" data-goto="context">All entries →</button></div>
+        <div id="ovPinned" class="list"></div>
+      </div>
+      <div class="card">
+        <h2>Status</h2>
+        <dl class="kv" id="ovStatus"></dl>
+        <div class="row between"><h3 class="sub">Apps</h3><button class="link" data-goto="connect">Manage →</button></div>
+        <div id="ovApps" class="list compact"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row between"><h2>Active tasks</h2><button class="ghost sm" data-goto="tasks">All tasks →</button></div>
+      <div id="ovTasks" class="list"></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="row between"><h2>Recent changes</h2><button class="ghost sm" data-goto="activity">Activity log →</button></div>
+        <div id="ovChanges" class="list"></div>
+      </div>
+      <div class="card">
+        <div class="row between"><h2>Recent GitHub activity</h2><button class="ghost sm" data-goto="projects">Projects →</button></div>
+        <div id="ovGithub" class="list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTEXT -->
+  <section id="tab-context" class="tab" hidden>
+    <div class="split">
+      <div class="card main-col">
+        <div class="row filters">
+          <input id="q" type="search" placeholder="Search titles, details, tags…">
+          <select id="kindFilter" aria-label="Kind"><option value="">All kinds</option></select>
+          <select id="statusFilter" aria-label="Status"><option value="open">Open</option><option value="">Any status</option><option value="done">Done</option><option value="archived">Archived</option></select>
+          <select id="sourceFilter" aria-label="App"><option value="">Any app</option></select>
+        </div>
+        <div id="tagChips" class="chips"></div>
+        <div class="row between list-head">
+          <h2 id="listTitle">Entries</h2>
+          <span><span class="muted small" id="entryCount"></span> <button type="button" class="link" id="clearFilters" hidden>Clear filters</button></span>
+        </div>
+        <div id="entries" class="entries"></div>
+      </div>
+      <aside class="side-col">
+        <form id="entryForm" class="card sticky">
+          <h2>Add to context</h2>
+          <div class="row">
+            <label>Kind
+              <select name="kind">
+                <option value="idea">Idea</option><option value="note">Note</option><option value="decision">Decision</option>
+                <option value="todo">Todo</option><option value="instruction">Instruction (agents follow it)</option><option value="profile">Profile</option>
+              </select>
+            </label>
+            <label>Repo (optional) <input name="repo" list="repoList" placeholder="e.g. my-app"></label>
+          </div>
+          <label>Title <input name="title" required placeholder="One line"></label>
+          <label>Details <textarea name="body" rows="6" placeholder="Markdown is fine: - bullets, **bold**, links"></textarea></label>
+          <label>Tags <input name="tags" placeholder="comma, separated"></label>
+          <div class="row checks">
+            <label class="check"><input type="checkbox" name="pinned"> Pin</label>
+            <label class="check" title="Shown here, hidden from agents unless they ask over the bearer-token connection"><input type="checkbox" name="private"> Private</label>
+          </div>
+          <div class="row">
+            <button type="submit">Save</button>
+            <button type="button" class="ghost" id="cancelEdit" hidden>Cancel edit</button>
+          </div>
+          <input type="hidden" name="id">
+        </form>
+      </aside>
+    </div>
+    <div class="card">
+      <div class="row between">
+        <h2>What agents see first</h2>
+        <div class="seg" id="bundleMode" role="group" aria-label="Bundle view">
+          <button type="button" class="ghost sm" data-mode="preview">Preview</button>
+          <button type="button" class="ghost sm" data-mode="raw">Raw</button>
+        </div>
+      </div>
+      <p class="muted">The <code>get_context</code> bundle every connected agent loads. Private entries are never in it.</p>
+      <p class="muted row between" id="gdocRow" hidden>
+        <span>Google Doc mirror: <span id="gdocInfo"></span> <a id="gdocLink" target="_blank" rel="noopener noreferrer">Open Doc</a></span>
+        <button type="button" class="ghost sm" id="gdocPush">Push now</button>
+      </p>
+      <div id="bundlePreview" class="bundle md tall"></div>
+      <pre id="bundle" class="bundle tall" hidden></pre>
+    </div>
+  </section>
+
+  <!-- TASKS -->
+  <section id="tab-tasks" class="tab" hidden>
+    <div class="card">
+      <div class="row between">
+        <h2>Tasks</h2>
+        <label class="check">Show <select id="taskStatus">
+          <option value="active">Open</option><option value="done">Done</option><option value="abandoned">Abandoned</option><option value="all">All</option>
+        </select></label>
+      </div>
+      <p class="muted">Multi-step work that any app can continue. Apps checkpoint after each step on the task's git branch; when one stops (for example at its usage limit), ask another to <code>resume_task</code> and it carries on from the last checkpoint. Tasks for repos the hub doesn't sync (company work) are private.</p>
+      <div id="taskList" class="list tasks"></div>
+    </div>
+  </section>
+
+  <!-- ACTIVITY -->
+  <section id="tab-activity" class="tab" hidden>
+    <div class="card">
+      <div class="row between">
+        <h2>Activity log</h2>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="showContext" checked> Context and task rows</label>
+          <label class="check"><input type="checkbox" id="onlyUnlogged"> Only rows not yet in my work log</label>
+          <button class="ghost" id="copyRows">Copy as table</button>
+          <button class="ghost" id="markLogged">Mark shown as logged</button>
+        </div>
+      </div>
+      <p class="muted">Dates in <span id="tz"></span>. GitHub: one row per day per repo for commits (merge commits not counted; repeated messages shown once with ×N), one row per PR event. Context: one row per day with every change from any app (private entries left out). Copy as table and "mark logged" (for your own work log) use GitHub rows only.</p>
+      <div class="table-wrap"><table id="activityTable"><thead><tr><th>Date</th><th>Repo</th><th>Type</th><th>Summary</th><th></th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="card" id="syncRunsCard">
+      <div class="row between">
+        <h2>GitHub sync runs</h2>
+        <label class="check"><input type="checkbox" id="notableRuns" checked> Only runs with new commits or errors</label>
+      </div>
+      <p class="muted">A repo that fails is fetched again from where it left off on the next run, so no commits are skipped.</p>
+      <div class="table-wrap"><table id="syncRunsTable"><thead><tr><th>Time</th><th>Result</th><th>Repos</th><th>New commits</th><th>PRs</th><th>Errors</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- PROJECTS -->
+  <section id="tab-projects" class="tab" hidden>
+    <div class="card">
+      <h2>GitHub projects</h2>
+      <p class="muted">Status and "use for" are yours; the rest comes from GitHub on each sync.</p>
+      <div class="table-wrap"><table id="projectsTable"><thead><tr><th>Repo</th><th>Visibility</th><th>Last push</th><th>Status</th><th>Use for</th><th></th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- APPS: one connection (token) per app and account -->
+  <section id="tab-connect" class="tab" hidden>
+    <div class="split">
+      <div class="card main-col">
+        <h2>Apps and accounts</h2>
+        <p class="muted">Each app and account gets its own token, so the hub knows exactly who changed what, and you can rotate or revoke one without touching the others. You connect each app <strong>once</strong>; it then works in every project. <a href="https://github.com/darshanbajgain/keepcontext/blob/main/docs/CONNECT_APPS.md" target="_blank" rel="noopener noreferrer">Step-by-step guide</a></p>
+        <div id="appsList"></div>
+      </div>
+      <aside class="side-col">
+        <form id="appForm" class="card sticky">
+          <h2>Add a connection</h2>
+          <label>App <select name="preset" id="appPreset"></select></label>
+          <label>Account (optional) <input name="account" placeholder="e.g. main, 90, work" maxlength="40"></label>
+          <label class="check" id="appPrivateRow"><input type="checkbox" name="canPrivate"> Allow private entries (header connections only)</label>
+          <p class="muted small" id="appPresetHint"></p>
+          <button type="submit">Create token</button>
+        </form>
+      </aside>
+    </div>
+    <div class="card token-card" id="tokenCard" hidden>
+      <div class="row between"><h2 id="tokenTitle">Token</h2><button type="button" class="ghost sm" id="tokenDone">Done, hide it</button></div>
+      <p class="warn">Copy this now: it is shown only once. Don't paste it into chats; put it straight into the app.</p>
+      <div id="tokenSetup"></div>
+    </div>
+    <div class="card">
+      <h2>Manual setup reference</h2>
+      <p class="muted">Generic snippets. Replace <code>HUB_TOKEN</code> with a connection token from above (or the shared token in <code>.env</code>). The secret URL never returns private entries.</p>
+      <div id="snippets"></div>
+    </div>
+  </section>
+
+  <!-- REPO FILES -->
+  <section id="tab-repo" class="tab" hidden>
+    <div class="card">
+      <h2>Context files for a repo</h2>
+      <p class="muted">Drop these into a repo so coding agents (Claude Code, Codex, Cursor, Gemini CLI, Antigravity, Copilot) know about the hub and your standing instructions. Nothing is written to GitHub from here.</p>
+      <div class="row">
+        <input id="repoFor" list="repoList" placeholder="Repo (optional)">
+        <button id="genFiles">Generate</button>
+      </div>
+      <p class="muted">Or from inside a local clone: <code>HUB_URL=… HUB_TOKEN=… npm run inject -- /path/to/repo</code></p>
+      <div id="repoFiles"></div>
+    </div>
+  </section>
+  <datalist id="repoList"></datalist>
+</main>
+<footer class="foot-note muted small">KeepContext <span id="version"></span> · <a href="https://github.com/darshanbajgain/keepcontext/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">changelog</a></footer>
+<script src="/app.js" type="module"></script>
+</body>
+</html>

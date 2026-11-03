@@ -1,0 +1,44 @@
+# Release: pushing a tag like v1.2.3 runs the tests, checks the tag matches package.json,
+# and publishes a GitHub Release with that version's section from CHANGELOG.md. Explained in docs/CICD.md section 7.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write # create the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+      - name: Tag must match package.json
+        run: |
+          pkg="v$(node -p "require('./package.json').version")"
+          if [ "$pkg" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($pkg). Bump the version first."
+            exit 1
+          fi
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          # The lines between "## [x.y.z]" and the next "## [" heading (or the link list at the end).
+          awk -v v="$v" 'index($0, "## [" v "]") == 1 {on=1; next} on && (/^## \[/ || /^\[[^]]+\]: /) {exit} on' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "::error::No '## [$v]' section in CHANGELOG.md"; exit 1; fi
+          cat notes.md
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "KeepContext $GITHUB_REF_NAME" --notes-file notes.md --verify-tag
