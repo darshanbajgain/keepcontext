@@ -1,7 +1,12 @@
 node_modules
 data
+data-dev
 .env
 .git
-data-dev
+.github
+.vscode
+test
+docs
+*.md
 google-sa.json
 *-sa.json

@@ -24,7 +24,9 @@ export const config = {
   version: pkg.version,
   port: Number(env.PORT || 8787),
   // Public base URL, used only to print copy-paste config snippets in the UI.
+  // Public base URL for copy-paste snippets. Empty = the address the browser or tunnel used (see baseUrl() in server.js).
   publicUrl: (env.PUBLIC_URL || `http://localhost:${env.PORT || 8787}`).replace(/\/$/, ''),
+  publicUrlSet: !!env.PUBLIC_URL,
   // Admin secret for the API and MCP. Optional: without it, the first-run setup page creates one.
   hubToken: env.HUB_TOKEN || '',
   // Password for the web UI. Defaults to HUB_TOKEN.

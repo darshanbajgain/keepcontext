@@ -387,8 +387,8 @@ export function workLogRows({ onlyUnlogged = true, days = 60 } = {}) {
 }
 
 /* ---------- context files to drop into a repo ---------- */
-export function repoContextFiles({ repo = null } = {}) {
-  const url = `${config.publicUrl}/mcp`;
+export function repoContextFiles({ repo = null, base = config.publicUrl } = {}) {
+  const url = `${base}/mcp`;
   const instructions = listEntries({ kind: 'instruction', limit: 50 }).filter((e) => e.status !== 'archived');
   const repoNotes = repo ? listEntries({ repo, limit: 20 }) : [];
 
@@ -763,8 +763,8 @@ if (!kvGet('backfill_app_v1')) {
  * scripts/connect-app.sh with this hub's public URL as the default, so anyone can run
  * `curl -fsSL <hub>/connect.sh | bash -s <app>` without cloning the repo. Contains no secrets.
  */
-export function connectScript() {
+export function connectScript(base = config.publicUrl) {
   const src = fs.readFileSync(new URL('../scripts/connect-app.sh', import.meta.url), 'utf8');
   // The served copy always targets this hub (a HUB_URL left in the user's shell must not redirect it).
-  return src.replace(/url="\$\{HUB_URL:-[^}]*\}"/, `url="${config.publicUrl}"`);
+  return src.replace(/url="\$\{HUB_URL:-[^}]*\}"/, `url="${base}"`);
 }

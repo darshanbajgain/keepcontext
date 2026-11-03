@@ -20,3 +20,5 @@ First public version.
 - **Settings tab:** name, timezone, password, a new admin token, and **Connect GitHub** (opens GitHub with a read-only token pre-filled; paste it back). Values in `.env` still win.
 - **Demo mode** (`DEMO=1`): a fictional person with entries from several apps, a handed-off task and GitHub-like activity.
 - **Work log CSV** download in the Activity log.
+- **Docker image** for amd64 and arm64 on GitHub Container Registry (non-root, health check, clean stop), and a compose file with optional public HTTPS: a Cloudflare quick tunnel (no account) or Tailscale Funnel (fixed address).
+- The hub detects its public address from the request when `PUBLIC_URL` isn't set, so snippets in the Apps tab show the tunnel's address.

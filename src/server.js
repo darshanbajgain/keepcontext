@@ -21,6 +21,16 @@ app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy);
 app.use(express.json({ limit: '1mb' }));
 
+/**
+ * The hub's public address for snippets: PUBLIC_URL if set, else the address this request came in on (a tunnel's
+ * https://… host via the trusted proxy headers, or localhost). Odd Host headers fall back to PUBLIC_URL's default.
+ */
+function baseUrl(req) {
+  if (config.publicUrlSet) return config.publicUrl;
+  const host = req.host || '';
+  return /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? `${req.protocol}://${host}` : config.publicUrl;
+}
+
 /* ---------- auth ---------- */
 const safeEq = (a, b) => {
   const x = Buffer.from(String(a)); const y = Buffer.from(String(b));
@@ -107,7 +117,7 @@ function setSession(req, res) {
 app.use((req, res, next) => {
   if (!S.setupNeeded()) return next();
   if (req.path.startsWith('/api') || req.path.startsWith('/mcp')) {
-    return res.status(503).json({ error: `Finish the first-run setup first: open ${config.publicUrl} in a browser.` });
+    return res.status(503).json({ error: `Finish the first-run setup first: open ${baseUrl(req)} in a browser.` });
   }
   next();
 });
@@ -133,7 +143,7 @@ async function handleMcp(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).set('Allow', 'POST').json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed' }, id: null });
   }
-  const server = buildMcpServer({ allowPrivate: !!res.locals.allowPrivate, caller: res.locals.caller });
+  const server = buildMcpServer({ allowPrivate: !!res.locals.allowPrivate, caller: res.locals.caller, base: baseUrl(req) });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => { transport.close(); server.close(); });
   try {
@@ -190,7 +200,7 @@ api.delete('/settings/github', wrap(() => S.disconnectGithub()));
 api.post('/settings/password', wrap((req) => S.changePassword(req.body || {})));
 api.post('/settings/admin-token', wrap(() => S.rotateAdminToken()));
 
-api.get('/status', wrap(() => ({
+api.get('/status', wrap((req) => ({
   owner: config.ownerName,
   version: config.version,
   githubOwner: kvGet('github_owner'),
@@ -198,7 +208,7 @@ api.get('/status', wrap(() => ({
   demo: DEMO,
   lastSyncAt: kvGet('last_sync_at'),
   timezone: config.timezone,
-  publicUrl: config.publicUrl,
+  publicUrl: baseUrl(req),
   autoSyncMinutes: config.autoSyncMinutes,
   gdoc: gdocStatus(),
   counts: {
@@ -241,7 +251,7 @@ api.post('/tasks/:id/reopen', wrap((req, res) => ctx.reopenTask(Number(req.param
 api.get('/context', (req, res) => {
   res.type('text/markdown').send(ctx.contextBundle({ repo: req.query.repo || null }));
 });
-api.get('/repo-files', wrap((req) => ctx.repoContextFiles({ repo: req.query.repo || null })));
+api.get('/repo-files', wrap((req) => ctx.repoContextFiles({ repo: req.query.repo || null, base: baseUrl(req) })));
 api.get('/export', wrap(() => ({
   exportedAt: new Date().toISOString(),
   entries: db.prepare('SELECT * FROM entries WHERE private = 0').all(), // private entries never leave via export
@@ -254,11 +264,11 @@ const pub = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'publi
 // demo: lets the login page show the demo password (demo mode only; a real hub never says this).
 app.get('/healthz', (req, res) => res.json(DEMO ? { ok: true, demo: true, demoPassword: DEMO_PASSWORD } : { ok: true }));
 // Public helper script (no secrets): curl -fsSL <hub>/connect.sh | bash -s <app>
-app.get('/connect.sh', (req, res) => res.type('text/x-shellscript').set('Cache-Control', 'no-store').send(ctx.connectScript()));
+app.get('/connect.sh', (req, res) => res.type('text/x-shellscript').set('Cache-Control', 'no-store').send(ctx.connectScript(baseUrl(req))));
 app.get('/', (req, res) => res.sendFile(path.join(pub, S.setupNeeded() ? 'setup.html' : authed(req) ? 'index.html' : 'login.html')));
 app.use(express.static(pub, { index: false }));
 
-app.listen(config.port, () => {
+const httpServer = app.listen(config.port, () => {
   console.log(`KeepContext on ${config.publicUrl}  (MCP: ${config.publicUrl}/mcp)`);
   const code = S.setupCodeForLog();
   if (code) console.log(`\nFirst-run setup: open ${config.publicUrl} and enter the setup code ${code}\n`);
@@ -274,4 +284,12 @@ if (config.autoSyncMinutes > 0) {
   }, (e) => console.error('auto-sync failed', e.message));
   setTimeout(run, 10e3);
   setInterval(run, Math.max(1, config.autoSyncMinutes) * 60e3);
+}
+
+// Clean stop (docker stop, Ctrl+C, systemd): finish open requests, then close the database so its WAL is merged.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.once(sig, () => {
+    httpServer.close();
+    setTimeout(() => { try { db.close(); } catch {} process.exit(0); }, 300).unref();
+  });
 }

@@ -1,9 +1,51 @@
+# KeepContext with Docker Compose.
+#   Local only (http://localhost:8787):      docker compose up -d
+#   + instant public HTTPS (changes on restart, for trying ChatGPT / Claude web / Gemini):
+#                                             docker compose --profile quick-tunnel up -d
+#   + fixed public HTTPS via Tailscale Funnel (free account; set TS_AUTHKEY in .env):
+#                                             docker compose --profile tailscale up -d
+# Then: docker compose logs keepcontext   → the setup code (first start) and the address.
+# The tunnel containers share KeepContext's network, so they reach it on localhost (a trusted proxy).
 services:
   keepcontext:
+    image: ghcr.io/darshanbajgain/keepcontext:latest
     build: .
-    env_file: .env
+    init: true
+    env_file:
+      - path: .env
+        required: false
     ports: ["8787:8787"]
-    volumes: ["hubdata:/data"]
+    volumes: ["keepcontext-data:/data"]
     restart: unless-stopped
+
+  # Cloudflare quick tunnel: no account needed. The https://….trycloudflare.com address is in
+  # `docker compose logs quick-tunnel` and changes every time this container restarts.
+  quick-tunnel:
+    profiles: [quick-tunnel]
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://localhost:8787
+    network_mode: service:keepcontext
+    depends_on: [keepcontext]
+    restart: unless-stopped
+
+  # Tailscale Funnel: a fixed https://keepcontext.<your-tailnet>.ts.net address.
+  # Needs TS_AUTHKEY (Tailscale admin → Settings → Keys) and Funnel allowed in your tailnet policy.
+  tailscale:
+    profiles: [tailscale]
+    image: tailscale/tailscale:latest
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: keepcontext
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/tailscale-funnel.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./docker/tailscale-funnel.json:/config/tailscale-funnel.json:ro
+    network_mode: service:keepcontext
+    depends_on: [keepcontext]
+    restart: unless-stopped
+
 volumes:
-  hubdata:
+  keepcontext-data:
+  tailscale-state:

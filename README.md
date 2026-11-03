@@ -16,7 +16,21 @@ KeepContext is a small Node app with a web UI and one MCP server that Claude (we
 
 ## Run it
 
-Node 22.13 or newer:
+**Docker** (recommended):
+
+```bash
+docker run -d --name keepcontext -p 8787:8787 -v keepcontext-data:/data ghcr.io/darshanbajgain/keepcontext:latest
+docker logs keepcontext   # shows the setup code; then open http://localhost:8787
+```
+
+To reach it from ChatGPT, Claude or Gemini on the web, it needs a public HTTPS address. With the [compose file](docker-compose.yml):
+
+- `docker compose --profile quick-tunnel up -d`: an instant `https://….trycloudflare.com` address, no account. It changes when the container restarts, so it's for trying it out.
+- `docker compose --profile tailscale up -d`: a fixed `https://keepcontext.<your-tailnet>.ts.net` address through Tailscale Funnel (free account; put `TS_AUTHKEY` in `.env`, and allow Funnel in your tailnet policy).
+
+Coding apps on the same machine (Claude Code, Codex, Cursor, Copilot, Gemini CLI) work with plain `http://localhost:8787`.
+
+**Node** 22.13 or newer:
 
 ```bash
 npm install

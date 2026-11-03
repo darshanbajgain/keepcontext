@@ -1,5 +1,5 @@
 # Release: pushing a tag like v1.2.3 runs the tests, checks the tag matches package.json,
-# and publishes a GitHub Release with that version's section from CHANGELOG.md. Explained in docs/CICD.md section 7.
+# and publishes a GitHub Release with that version's section from CHANGELOG.md. How to cut a release: CONTRIBUTING.md.
 name: Release
 
 on:

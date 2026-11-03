@@ -17,7 +17,7 @@ const includePrivate = z.boolean().optional()
  * caller: who is calling (server.js resolveCaller); its slug is recorded on every change, so the hub knows the app
  * even when the model reports the wrong source.
  */
-export function buildMcpServer({ allowPrivate = false, caller = null } = {}) {
+export function buildMcpServer({ allowPrivate = false, caller = null, base } = {}) {
   const priv = (asked) => allowPrivate && !!asked;
   const appSlug = caller?.slug || null;
   // Tasks: private ones (company repos) for callers allowed private context or that worked on them, never the secret URL.
@@ -141,7 +141,7 @@ export function buildMcpServer({ allowPrivate = false, caller = null } = {}) {
     description: 'KeepContext (personal shared memory): AGENTS.md, CLAUDE.md, GEMINI.md and .cursor/rules files that point any coding agent at this hub. Returns file contents; it does not write to any repo.',
     inputSchema: { repo: z.string().optional() },
     annotations: RO,
-  }, async ({ repo }) => text(ctx.repoContextFiles({ repo })));
+  }, async ({ repo }) => text(ctx.repoContextFiles({ repo, base })));
 
   /* ---------- continue-anywhere tasks (docs/HANDOFF_PLAN.md) ---------- */
   const list = (what) => z.array(z.string()).optional().describe(what);

@@ -103,7 +103,8 @@ flowchart LR
 | `test/mock-google.mjs` | Fake Google token endpoint and Docs API; verifies the JWT signature and keeps the Doc text in memory (`GET /_doc`) | |
 | `test/mock-github.mjs` | Fake GitHub API (Express) with fixed repos, commits and PRs; token must be `ghtest`. `POST`/`DELETE /_fail/<repo>` makes a repo's commits fail (tests for sync errors) | |
 | `docs/` | This guide, `CONNECT_APPS.md` (connecting each AI app), `HANDOFF_PLAN.md` (continue-anywhere design) | |
-| `Dockerfile`, `docker-compose.yml` | Container build; data on a `/data` volume | |
+| `Dockerfile`, `docker-compose.yml`, `docker/` | Container image (non-root, health check) and compose file with optional tunnel profiles (`quick-tunnel`, `tailscale`) | |
+| `.github/workflows/docker.yml` | On a version tag: multi-arch image to GitHub Container Registry | |
 | `.mcp.json` | Connects Claude Code in this folder to the local hub (`${HUB_TOKEN}` from the shell) | |
 | `CLAUDE.md`, `TODO.md` | Rules for agents working on this repo; roadmap | |
 
@@ -354,7 +355,7 @@ Details:
 | `AUTO_SYNC_HOURS` | 0 | Older, coarser interval |
 | `INCLUDE_FORKS` | false | Sync forks too |
 | `TIMEZONE` | UTC (setup page / Settings tab) | Activity-log dates (IANA name) |
-| `PUBLIC_URL` | `http://localhost:PORT` | Shown in Connect snippets and repo files |
+| `PUBLIC_URL` | empty: the address the request came in on | Base URL in Apps-tab snippets, `/connect.sh` and repo files. Set it if the hub is reached through a proxy elsewhere |
 | `PORT` | 8787 | HTTP port |
 | `OWNER_NAME` | empty (Settings tab) | Your name in the bundle heading and repo files |
 | `DATA_DIR` | `./data` (`/data` in Docker) | Where `hub.db` lives |
@@ -376,9 +377,9 @@ Details:
 
 ## 9. Deployment
 
-- **Docker:** `node:22-slim`, `npm ci --omit=dev`, data on the `/data` volume. Any host that keeps a persistent volume works (a VPS, a home server or Raspberry Pi, Railway, Render, Fly.io). Serverless hosts without a disk (Vercel, Netlify) don't.
+- **Docker (main install path):** `node:22-slim`, production dependencies only, runs as the unprivileged `node` user, `HEALTHCHECK` on `/healthz`, OCI labels, data in the `/data` volume; SIGTERM closes the HTTP server and the database. Published for amd64 and arm64 to `ghcr.io/darshanbajgain/keepcontext` on every version tag (`.github/workflows/docker.yml`); CI builds it and checks that it starts healthy. `docker-compose.yml` runs it locally, plus optional profiles `quick-tunnel` (Cloudflare quick tunnel: instant public HTTPS, new address on every restart) and `tailscale` (Tailscale Funnel: fixed `https://keepcontext.<tailnet>.ts.net`, needs `TS_AUTHKEY`, config in `docker/tailscale-funnel.json`). The tunnel containers share the hub's network namespace, so they reach it on 127.0.0.1 and count as a trusted loopback proxy (client IP and `Secure` cookies work). Any host with a persistent volume works (VPS, home server, Raspberry Pi, Railway, Render, Fly.io); serverless hosts without a disk don't.
 - **Plain Node on a VM:** `scripts/vm-setup.sh` installs Node and a systemd service; `scripts/deploy.sh` updates it (health check and rollback).
-- **HTTPS:** put it behind a reverse proxy or tunnel on the same machine (Caddy, cloudflared, Tailscale Funnel). Set `PUBLIC_URL` to the HTTPS address. Express trusts a proxy on the same machine (`TRUST_PROXY=loopback`), so `Secure` cookies and client IPs work; set `TRUST_PROXY` if the proxy runs elsewhere.
+- **HTTPS without Docker's tunnels:** put it behind a reverse proxy or tunnel on the same machine (Caddy, cloudflared, Tailscale Funnel). Express trusts a proxy on the same machine (`TRUST_PROXY=loopback`); set `TRUST_PROXY` if the proxy runs elsewhere, and `PUBLIC_URL` if the detected address is wrong.
 - Health check: `GET /healthz` → `{"ok":true}`.
 - Backups: `scripts/backup.sh` takes a consistent snapshot (keeps the newest 14; `--stdout` to stream it elsewhere, e.g. from a scheduled job, then encrypt it); `scripts/restore.sh` swaps one back with a health check and automatic undo. `/api/export` leaves private entries out, so it isn't a backup.
 

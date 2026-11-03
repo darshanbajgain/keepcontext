@@ -5,7 +5,8 @@
 - [x] **First-run setup page:** setup code from the log, password, timezone; the admin token is generated and shown once. No `.env` needed.
 - [x] **GitHub optional everywhere**, and **Connect GitHub** in the Settings tab (pre-filled read-only token link).
 - [x] **Demo mode** (`DEMO=1`) with a fictional person, for screenshots and trying it out.
-- [ ] **Docker:** non-root user, `HEALTHCHECK`, OCI labels; multi-arch image on GitHub Container Registry on every release; compose file.
+- [x] **Docker:** non-root user, `HEALTHCHECK`, OCI labels, clean stop; multi-arch image on GitHub Container Registry on every release; compose file with optional Cloudflare quick tunnel and Tailscale Funnel.
+- [ ] Test the `tailscale` compose profile with a real auth key.
 - [ ] **Docs:** README with screenshots and a 3-step quick start, self-hosting guides (Docker, VPS, home server), security model.
 - [ ] **Community files:** LICENSE (AGPL-3.0), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, Dependabot, CodeQL.
 - [ ] Test the image on a clean machine; tag `v1.0.0`.

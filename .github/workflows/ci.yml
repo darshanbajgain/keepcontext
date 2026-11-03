@@ -27,3 +27,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+
+  docker:
+    name: Docker image starts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t keepcontext:ci .
+      - name: Start it and wait until healthy
+        run: |
+          docker run -d --name kc -p 8787:8787 -e SETUP_CODE=CI123 keepcontext:ci
+          for i in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' kc)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect -f '{{.State.Health.Status}}' kc | grep -q healthy || { docker logs kc; exit 1; }
+          [ "$(docker exec kc id -un)" = node ]
+          curl -fsS http://localhost:8787/ | grep -q "Welcome to KeepContext"
+          docker logs kc | grep -q "setup code CI123"
+          docker stop kc
