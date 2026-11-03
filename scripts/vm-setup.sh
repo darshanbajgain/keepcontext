@@ -56,14 +56,12 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable keepcontext >/dev/null 2>&1
 
-if [ -f "$APP_DIR/.env" ]; then
-  sudo systemctl restart keepcontext
-  sleep 2
-  if curl -fsS http://localhost:8787/healthz >/dev/null; then
-    echo "==> KeepContext is running on http://localhost:8787"
-  else
-    echo "!! Service did not answer. Check: journalctl -u keepcontext -n 50"
-  fi
+# .env is optional: without it, the first-run setup page asks for a password (the setup code is in the log).
+sudo systemctl restart keepcontext
+sleep 2
+if curl -fsS http://localhost:8787/healthz >/dev/null; then
+  echo "==> KeepContext is running on http://localhost:8787"
+  journalctl -u keepcontext -n 20 --no-pager | grep -o "setup code .*" | tail -1 | sed 's/^/==> First-run /' || true
 else
-  echo "==> No .env yet. Upload or create $APP_DIR/.env, then run: sudo systemctl start keepcontext"
+  echo "!! Service did not answer. Check: journalctl -u keepcontext -n 50"
 fi

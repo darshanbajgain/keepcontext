@@ -22,3 +22,8 @@ First public version.
 - **Work log CSV** download in the Activity log.
 - **Docker image** for amd64 and arm64 on GitHub Container Registry (non-root, health check, clean stop), and a compose file with optional public HTTPS: a Cloudflare quick tunnel (no account) or Tailscale Funnel (fixed address).
 - The hub detects its public address from the request when `PUBLIC_URL` isn't set, so snippets in the Apps tab show the tunnel's address.
+- Docs: README with screenshots, self-hosting guide (Docker, tunnels, VPS, backups and restore), contributing guide with the release process, security policy.
+
+### Security
+
+- Dependencies updated: body-parser (high) and fast-uri (moderate) advisories fixed.

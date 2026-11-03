@@ -1,0 +1,43 @@
+name: Bug report
+description: Something doesn't work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Never paste tokens (`chub_…`, the admin token), secret URLs (`/mcp/k/…`) or private entries. For security problems, use **Security → Report a vulnerability** instead."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. …\n2. …"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: KeepContext version
+      description: Shown at the bottom of the web UI
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options: [Docker, Docker Compose, Node (npm start), Other]
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: Which AI app, if any? (and its version)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or browser console errors
+      render: text

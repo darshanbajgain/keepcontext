@@ -73,7 +73,7 @@ The command downloads a small script **from your own hub** (it contains no secre
 
 ## 4. Make every project use the hub
 
-Being connected isn't the same as being used: add a short **global instruction** to each app once, telling it to load your context at the start and save decisions back. See README section 4 ("Make every repo use the hub") for the file per app and the text to paste. Nothing is committed to any repo, so this is safe for work repos too.
+Being connected isn't the same as being used: add a short **global instruction** to each app once, telling it to load your context at the start and save decisions back. See ["Tell your apps to use it" in the README](../README.md#tell-your-apps-to-use-it) for the file per app and the text to paste. Nothing is committed to any repo, so this is safe for work repos too.
 
 ## 5. Check it works
 

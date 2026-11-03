@@ -63,8 +63,11 @@ export function seedDemo() {
   const open = ctx.startTask({ title: 'Offline mode for trailmap', goal: 'Cache the last 5 routes for offline use', repo: 'trailmap', next: ['Service worker with a cache-first strategy'] }, viewer(code));
   ctx.checkpointTask(open.id, { summary: 'Service worker registered; caching the route list', files: ['src/sw.js'], next: ['Cache map tiles for saved routes', 'Test in airplane mode'] }, viewer(code));
   // Spread the checkpoints over the last days.
-  const cps = db.prepare('SELECT id, task_id FROM task_checkpoints ORDER BY id').all();
-  cps.forEach((c, i) => db.prepare('UPDATE task_checkpoints SET at = ? WHERE id = ?').run(iso(c.task_id === t.id ? 5 - i * 0.6 : 0.2, i), c.id));
+  // Oldest first: the finished task over five days, the open one over the last half day.
+  for (const [taskId, start, step] of [[t.id, 5, 0.6], [open.id, 0.5, 0.1]]) {
+    db.prepare('SELECT id FROM task_checkpoints WHERE task_id = ? ORDER BY id').all(taskId)
+      .forEach((c, i) => db.prepare('UPDATE task_checkpoints SET at = ? WHERE id = ?').run(iso(start - i * step), c.id));
+  }
   db.prepare('UPDATE tasks SET created_at = (SELECT min(at) FROM task_checkpoints WHERE task_id = tasks.id), updated_at = (SELECT max(at) FROM task_checkpoints WHERE task_id = tasks.id)').run();
 
   // GitHub-like commits and pull requests (no GitHub involved).

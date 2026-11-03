@@ -102,7 +102,8 @@ flowchart LR
 | `test/hub.test.mjs` | End-to-end `node:test` suite: starts the fake GitHub and the hub as child processes, drives REST and MCP | |
 | `test/mock-google.mjs` | Fake Google token endpoint and Docs API; verifies the JWT signature and keeps the Doc text in memory (`GET /_doc`) | |
 | `test/mock-github.mjs` | Fake GitHub API (Express) with fixed repos, commits and PRs; token must be `ghtest`. `POST`/`DELETE /_fail/<repo>` makes a repo's commits fail (tests for sync errors) | |
-| `docs/` | This guide, `CONNECT_APPS.md` (connecting each AI app), `HANDOFF_PLAN.md` (continue-anywhere design) | |
+| `docs/` | This guide, `CONNECT_APPS.md` (connecting each AI app), `SELF_HOSTING.md` (Docker, tunnels, VPS, backups), `HANDOFF_PLAN.md` (continue-anywhere design), `images/` (README screenshots from demo mode) | |
+| `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/dependabot.yml`, `.github/workflows/codeql.yml` | Community files: how to develop and release, private vulnerability reporting, templates, dependency updates, code scanning | |
 | `Dockerfile`, `docker-compose.yml`, `docker/` | Container image (non-root, health check) and compose file with optional tunnel profiles (`quick-tunnel`, `tailscale`) | |
 | `.github/workflows/docker.yml` | On a version tag: multi-arch image to GitHub Container Registry | |
 | `.mcp.json` | Connects Claude Code in this folder to the local hub (`${HUB_TOKEN}` from the shell) | |

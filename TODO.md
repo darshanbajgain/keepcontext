@@ -7,9 +7,9 @@
 - [x] **Demo mode** (`DEMO=1`) with a fictional person, for screenshots and trying it out.
 - [x] **Docker:** non-root user, `HEALTHCHECK`, OCI labels, clean stop; multi-arch image on GitHub Container Registry on every release; compose file with optional Cloudflare quick tunnel and Tailscale Funnel.
 - [ ] Test the `tailscale` compose profile with a real auth key.
-- [ ] **Docs:** README with screenshots and a 3-step quick start, self-hosting guides (Docker, VPS, home server), security model.
-- [ ] **Community files:** LICENSE (AGPL-3.0), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, Dependabot, CodeQL.
-- [ ] Launch: make the repo public, set the ghcr.io package to public (Package settings → Change visibility), test `docker run` on a clean machine, tag `v1.0.0`.
+- [x] **Docs:** README with screenshots and a quick start, self-hosting guide (Docker, tunnels, VPS, backups), security model.
+- [x] **Community files:** LICENSE (AGPL-3.0), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, Dependabot, CodeQL (runs once public).
+- [ ] Launch: make the repo public, turn on private vulnerability reporting and secret scanning (Settings → Code security), set the ghcr.io package to public (Package settings → Change visibility), test `docker run` on a clean machine, tag `v1.0.0`.
 
 ## Later
 

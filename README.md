@@ -1,55 +1,133 @@
 # KeepContext
 
-One self-hosted memory for every AI app you use. Tell ChatGPT an idea, and Cursor, Claude Code and Gemini know it too. Start a task in Claude Code, and when it hits its usage limit, Codex continues from the last checkpoint.
+[![CI](https://github.com/darshanbajgain/keepcontext/actions/workflows/ci.yml/badge.svg)](https://github.com/darshanbajgain/keepcontext/actions/workflows/ci.yml) · [Changelog](CHANGELOG.md) · [AGPL-3.0](LICENSE)
 
-KeepContext is a small Node app with a web UI and one MCP server that Claude (web, desktop, Claude Code), ChatGPT, Gemini, Cursor, Codex, Copilot and Antigravity all connect to.
+**One self-hosted memory for every AI app you use.** Tell ChatGPT an idea, and Claude Code, Cursor and Gemini know it too. Start a task in Claude Code, and when it hits its usage limit, Codex continues from where it stopped.
 
-> Work in progress: preparing the first public release. See [TODO.md](TODO.md).
+KeepContext is a small server with a web dashboard and one [MCP](https://modelcontextprotocol.io) endpoint. ChatGPT, Claude (web, desktop, Claude Code), Gemini (web, CLI), Cursor, Codex, GitHub Copilot and Antigravity all connect to it. Your data stays on your machine or server.
 
-## Features
+![Overview: counts, pinned items, which apps changed what, active tasks](docs/images/overview.png)
 
-- **Shared memory:** ideas, notes, decisions, todos, standing instructions and profile facts that every connected app reads with `get_context` and adds to with `save_entry`.
-- **Verified per-app attribution:** each app and account gets its own token, so you see which app added or changed what; rotate or revoke one without touching the others.
-- **Continue anywhere:** tasks with checkpoints and a git branch, so another app picks up where one stopped, and the first can review what the others did.
-- **Private by design:** self-hosted; private entries and private tasks never reach URL-only apps or mirrors.
-- **GitHub activity** (optional, read-only): commits and pull requests in an activity log, with a work log export.
+## What it does
 
-## Run it
+- **One memory for all your AI apps.** Ideas, decisions, todos, notes, standing instructions ("keep answers short") and facts about you. Every connected app loads them with `get_context` and adds to them with `save_entry`.
+- **Continue anywhere.** For multi-step coding work, apps start a task and save a short checkpoint after each step on the task's git branch. When one app hits its limit, another says "resume my task" and gets the goal, the next steps, the branch and the history. Later, the first app can review what the others did.
+- **Know which app did what.** Each app and account gets its own token, so the dashboard shows verified badges (ChatGPT · personal, Claude Code, Cursor…) instead of trusting what a model says about itself. Rotate or revoke one app without touching the others.
+- **Private by design.** Self-hosted, with private entries and tasks that never go to apps connected by URL. Tokens are stored only as hashes, there are rate limits, and GitHub access is read-only.
+- **Your work log (optional).** Connect GitHub (read-only) to see commits and pull requests per day in an activity log, ready to copy into a status report or CV notes.
 
-**Docker** (recommended):
+![Tasks: Claude Code started, hit its limit, Codex took over, Cursor finished](docs/images/tasks.png)
+
+## Quick start
+
+### Docker
 
 ```bash
 docker run -d --name keepcontext -p 8787:8787 -v keepcontext-data:/data ghcr.io/darshanbajgain/keepcontext:latest
-docker logs keepcontext   # shows the setup code; then open http://localhost:8787
+docker logs keepcontext      # shows a one-time setup code
 ```
 
-To reach it from ChatGPT, Claude or Gemini on the web, it needs a public HTTPS address. With the [compose file](docker-compose.yml):
+Open http://localhost:8787, enter the setup code, and choose a password. That's all the configuration there is.
 
-- `docker compose --profile quick-tunnel up -d`: an instant `https://….trycloudflare.com` address, no account. It changes when the container restarts, so it's for trying it out.
-- `docker compose --profile tailscale up -d`: a fixed `https://keepcontext.<your-tailnet>.ts.net` address through Tailscale Funnel (free account; put `TS_AUTHKEY` in `.env`, and allow Funnel in your tailnet policy).
+Want to look around first? `docker run --rm -p 8787:8787 -e DEMO=1 ghcr.io/darshanbajgain/keepcontext:latest` starts a demo with a fictional developer (the password is on the login page).
 
-Coding apps on the same machine (Claude Code, Codex, Cursor, Copilot, Gemini CLI) work with plain `http://localhost:8787`.
+### Reach it from ChatGPT, Claude and Gemini on the web
 
-**Node** 22.13 or newer:
+Web apps need a public HTTPS address. The [compose file](docker-compose.yml) has two built-in options:
 
-```bash
-npm install
-npm start                # prints a setup code, then open http://localhost:8787
+| Command | Address | Good for |
+| --- | --- | --- |
+| `docker compose --profile quick-tunnel up -d` | `https://….trycloudflare.com` (in `docker compose logs quick-tunnel`), **changes on every restart** | Trying it out, no account needed |
+| `docker compose --profile tailscale up -d` | a fixed `https://keepcontext.<your-tailnet>.ts.net` | Everyday use. Free [Tailscale](https://tailscale.com) account; put `TS_AUTHKEY` in `.env` and [allow Funnel](https://tailscale.com/kb/1223/funnel) in your tailnet |
+
+Or put it behind your own domain with Caddy or Nginx ([self-hosting guide](docs/SELF_HOSTING.md)). Coding apps on the same machine work with plain `http://localhost:8787`.
+
+### Without Docker
+
+Node 22.13 or newer: `npm install && npm start`, then open http://localhost:8787. The setup code is printed in the terminal.
+
+## Connect your apps
+
+In the **Apps** tab, **Add a connection** for each app (and account). It shows that app's setup once:
+
+| App | How |
+| --- | --- |
+| **ChatGPT** | **Plugins** (left sidebar) → add your own plugin with the secret URL, no authentication → **Allow all tools**. Works on the free plan. |
+| **Claude** (web, desktop, mobile) | Settings → Connectors → Add custom connector → the secret URL |
+| **Gemini** | Customise → Connectors → Custom → the secret URL |
+| **Claude Code, Codex, Cursor, Copilot, Gemini CLI, Antigravity** | One command in any terminal: `curl -fsSL https://YOUR-HUB/connect.sh \| bash -s codex` (or `claude-code`, `cursor`, `copilot`, `gemini-cli`, `antigravity`), then paste the token |
+
+Step by step, with troubleshooting: [docs/CONNECT_APPS.md](docs/CONNECT_APPS.md).
+
+![Apps: one connection per app and account](docs/images/apps.png)
+
+### Tell your apps to use it
+
+Connected isn't the same as used. Add this once to each app's personal instructions:
+
+| App | File or setting |
+| --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` |
+| Codex | `~/.codex/AGENTS.md` |
+| Gemini CLI, Antigravity | `~/.gemini/GEMINI.md` |
+| Cursor | Settings → Rules → User Rules |
+| Copilot (VS Code) | a `*.instructions.md` file in your VS Code user `prompts` folder with `applyTo: '**'` |
+| ChatGPT, Claude, Gemini web | Custom instructions / personal preferences |
+
+```markdown
+## KeepContext: my shared memory across AI apps
+- At the start of a task, call `get_context` from the keepcontext MCP server (pass `repo` = the repository name) and follow its standing instructions.
+- Before asking me for background, use `search_context`.
+- Save new ideas, decisions, todos and notes with `save_entry`.
+- For multi-step work, `start_task`, then `checkpoint_task` after each step, so another app can continue with `resume_task` if you stop. At the start, check `list_open_tasks`.
+- Never print tokens or the secret `/mcp/k/…` URL.
 ```
 
-The setup page asks for that code, a password and your timezone, and creates your admin token. Then:
+This lives in your home folder, so every project is covered and nothing is committed to any repo. For a single repo, the **Repo files** tab generates `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / Cursor rule files instead.
 
-1. **Apps** tab: connect your AI apps ([docs/CONNECT_APPS.md](docs/CONNECT_APPS.md)).
-2. **Settings** tab (optional): **Connect GitHub** opens GitHub with a read-only token already filled in; paste it back.
+## MCP tools
 
-No `.env` is needed; every setting in [.env.example](.env.example) is optional and wins over the UI. To look around first: `DEMO=1 npm start` fills the hub with a fictional person.
+| Tool | What it does |
+| --- | --- |
+| `get_context` | The bundle to load first: profile, standing instructions, pinned items, recent ideas, decisions and todos, open tasks, projects, recent activity |
+| `search_context`, `list_entries` | Find earlier ideas, notes and decisions |
+| `save_entry`, `update_entry` | Add or edit an idea, note, decision, todo, instruction or profile fact |
+| `start_task`, `checkpoint_task` | Start multi-step work (returns a task id and a branch), then record progress after each step |
+| `list_open_tasks`, `resume_task` | See unfinished tasks; continue one from its last checkpoint, or review what other apps did since yours |
+| `finish_task` | Mark a task done or abandoned, with the result |
+| `list_projects`, `update_project` | Your GitHub repos with your own status and notes |
+| `get_activity`, `sync_github` | Activity log rows; sync GitHub now |
+| `get_unlogged_activity`, `mark_activity_logged` | Activity not yet copied to your work log, then mark it copied |
+| `get_repo_context_files` | The AGENTS.md / CLAUDE.md / GEMINI.md / Cursor rule contents for a repo |
 
-## Docs
+## Security and privacy
 
-- [docs/CONNECT_APPS.md](docs/CONNECT_APPS.md): connecting each AI app
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it works, data model, security model, configuration
-- [docs/HANDOFF_PLAN.md](docs/HANDOFF_PLAN.md): the continue-anywhere design
+- **Your server, your data.** Everything is in one SQLite file in the data volume. Nothing is sent anywhere except to the AI apps you connect, to GitHub's API if you connect it (read-only), and to one Google Doc if you turn on the optional mirror (never private entries).
+- **Tokens:** each app has its own token, stored only as a SHA-256 hash and shown once. The admin password is hashed with scrypt. A one-time setup code stops anyone else from claiming a freshly started server.
+- **Private entries and tasks** stay in the dashboard. Apps connected by a secret URL (the web apps) never receive them; header-based apps only when you allow it per connection. Tasks for repos KeepContext doesn't sync (for example work repos) are private automatically.
+- **Rate limits** on failed logins, wrong tokens and requests per app.
+- **Treat secret URLs like passwords.** If one leaks, rotate that connection in the Apps tab.
+
+Details: [docs/ARCHITECTURE.md §6](docs/ARCHITECTURE.md#6-security-model). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Configuration
+
+Nothing is required. The setup page and the **Settings** tab cover the password, your name, timezone and GitHub. Every setting can also be set as an environment variable or in `.env`; those win over the UI. See [.env.example](.env.example) and [docs/ARCHITECTURE.md §7](docs/ARCHITECTURE.md#7-configuration). Backups, updates and running without Docker: [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
+
+## FAQ
+
+**Does it need GitHub?** No. Without it, KeepContext is a shared memory with tasks. GitHub adds the activity log and the Projects tab.
+
+**Does it work on the ChatGPT free plan?** Yes, as a custom plugin (checked November 2026). Set the plugin to "Allow all tools", or ChatGPT asks before every save.
+
+**Can I run it on a Raspberry Pi?** Yes. The image is published for arm64 too.
+
+**How is this different from each app's own memory?** Each app's memory stays inside that app. KeepContext is one memory that every app reads and writes, on your own server, and it can hand a task from one app to another.
+
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Run `npm test` before opening a pull request.
 
 ## License
 
-[AGPL-3.0](LICENSE). You may self-host and modify it; if you offer a modified version as a network service, you must publish your changes.
+[AGPL-3.0](LICENSE). You can use, self-host and modify KeepContext freely. If you offer a modified version to others as a network service, you must publish your changes under the same license.
