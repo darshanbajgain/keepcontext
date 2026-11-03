@@ -1,5 +1,5 @@
 # KeepContext image. Published to ghcr.io on every release tag (.github/workflows/docker.yml).
-FROM node:22-slim
+FROM node:26-slim
 
 WORKDIR /app
 ENV NODE_ENV=production DATA_DIR=/data PORT=8787
