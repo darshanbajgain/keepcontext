@@ -438,4 +438,4 @@ Principles that stay: business logic only in `context.js` (and a future `tasks.j
 
 ## 13. Change log
 
-- First public version (see `CHANGELOG.md`).
+- **2026-11-04:** v1.0.0, first public version (see `CHANGELOG.md`).

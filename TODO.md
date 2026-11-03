@@ -1,6 +1,6 @@
 # Roadmap
 
-## Before the first public release (1.0.0)
+## First public release (1.0.0)
 
 - [x] **First-run setup page:** setup code from the log, password, timezone; the admin token is generated and shown once. No `.env` needed.
 - [x] **GitHub optional everywhere**, and **Connect GitHub** in the Settings tab (pre-filled read-only token link).
@@ -9,7 +9,7 @@
 - [ ] Test the `tailscale` compose profile with a real auth key.
 - [x] **Docs:** README with screenshots and a quick start, self-hosting guide (Docker, tunnels, VPS, backups), security model.
 - [x] **Community files:** LICENSE (AGPL-3.0), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, Dependabot, CodeQL (runs once public).
-- [ ] Launch: make the repo public, turn on private vulnerability reporting and secret scanning (Settings → Code security), set the ghcr.io package to public (Package settings → Change visibility), test `docker run` on a clean machine, tag `v1.0.0`.
+- [x] Launch (2026-11-04): repo public, private vulnerability reporting and secret scanning on, ghcr.io package public, `v1.0.0` tagged.
 
 ## Later
 

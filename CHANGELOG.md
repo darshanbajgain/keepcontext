@@ -4,7 +4,9 @@ All notable changes to KeepContext. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
-First public version.
+## [1.0.0] - 2026-11-04
+
+First public version: one self-hosted memory for every AI app, with tasks any app can continue.
 
 ### Added
 
@@ -27,3 +29,6 @@ First public version.
 ### Security
 
 - Dependencies updated: body-parser (high) and fast-uri (moderate) advisories fixed.
+
+[Unreleased]: https://github.com/darshanbajgain/keepcontext/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/darshanbajgain/keepcontext/releases/tag/v1.0.0
