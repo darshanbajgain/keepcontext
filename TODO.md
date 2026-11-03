@@ -9,7 +9,7 @@
 - [ ] Test the `tailscale` compose profile with a real auth key.
 - [ ] **Docs:** README with screenshots and a 3-step quick start, self-hosting guides (Docker, VPS, home server), security model.
 - [ ] **Community files:** LICENSE (AGPL-3.0), CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, Dependabot, CodeQL.
-- [ ] Test the image on a clean machine; tag `v1.0.0`.
+- [ ] Launch: make the repo public, set the ghcr.io package to public (Package settings → Change visibility), test `docker run` on a clean machine, tag `v1.0.0`.
 
 ## Later
 
