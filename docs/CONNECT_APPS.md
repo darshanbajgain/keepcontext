@@ -41,7 +41,7 @@ Sign in to the right account first, then paste the **secret URL** from the card:
 
 | App | Where |
 | --- | --- |
-| **ChatGPT** | Settings → Apps & Connectors → Advanced → **Developer mode** on → **Create** → name `KeepContext`, URL = secret URL, Authentication **No authentication** → Create. In a chat, enable it from **+ → Developer mode**. |
+| **ChatGPT** | **Plugins** in the left sidebar (or Settings → Integrations → Plugins) → add your own plugin: name `KeepContext`, URL = secret URL, no authentication. Then open it and set the permission to **Allow all tools**, so saving ideas doesn't ask for approval every time. Works on the free plan (checked 2026-11-03). Older accounts may show it as Settings → Apps & Connectors → Developer mode instead. |
 | **Claude** (web, desktop, mobile) | Settings → **Connectors** → **Add custom connector** → name `KeepContext`, URL = secret URL, **No sign-in**, no headers. |
 | **Claude with private access** | Same, but URL = `https://YOUR-HUB/mcp` and a **request header** `Authorization` = `Bearer <token>` (create the connection with "Allow private entries"). |
 | **Gemini** | **Customise → Connectors → + Custom** → URL = secret URL → Next. |

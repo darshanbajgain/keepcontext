@@ -430,7 +430,7 @@ function loadConnect() {
   const items = [
     ['Claude Code (terminal, VS Code, JetBrains)', 'Run once in a terminal:', `claude mcp add --transport http --scope user keepcontext ${url} \\\n  --header "Authorization: Bearer HUB_TOKEN"`],
     ['Claude app (claude.ai, desktop, mobile)', 'Settings → Connectors → Add custom connector → name KeepContext → paste the secret URL → No sign-in. (Or the /mcp URL plus a request header "Authorization: Bearer HUB_TOKEN", which also allows include_private.)', secret],
-    ['ChatGPT', 'Settings → Apps & Connectors → Advanced → turn on Developer mode. Then Create, paste the secret URL, choose "No authentication", and Create. Write tools depend on your plan.', secret],
+    ['ChatGPT', 'Plugins (left sidebar) → add your own plugin: paste the secret URL, no authentication. Then set the plugin to "Allow all tools" so saving doesn\'t ask every time. Works on the free plan.', secret],
     ['Gemini (web)', 'Customise → Connectors → + Custom → paste the secret URL → Next. Gemini can also read the Google Doc mirror (Gems → Knowledge).', secret],
     ['Cursor', '~/.cursor/mcp.json (all projects) or .cursor/mcp.json in a repo:', JSON.stringify({ mcpServers: { 'keepcontext': { url, headers: { Authorization: 'Bearer HUB_TOKEN' } } } }, null, 2)],
     ['Antigravity', 'Agent panel → … → MCP Servers → Manage → View raw config (the file is ~/.gemini/antigravity/mcp_config.json). The app does not read shell variables, so put the token itself in the header and keep the file private (chmod 600):', JSON.stringify({ mcpServers: { 'keepcontext': { serverUrl: url, headers: { Authorization: 'Bearer HUB_TOKEN' } } } }, null, 2)],
@@ -484,7 +484,7 @@ function setupFor(app, token) {
   // Works from any terminal: the hub serves the helper; it asks for the token (hidden) and edits that app's config once.
   const local = (name) => `curl -fsSL ${status.publicUrl}/connect.sh | bash -s ${name}`;
   const S = {
-    chatgpt: [['ChatGPT', 'Settings → Apps & Connectors → Advanced → Developer mode on → Create. Name: KeepContext. MCP Server URL: this. Authentication: No authentication.', secret]],
+    chatgpt: [['ChatGPT', 'Plugins (left sidebar) → add your own plugin. Name: KeepContext. URL: this. No authentication. Then set it to "Allow all tools".', secret]],
     'claude-web': [['Claude (web, desktop, mobile)', 'Settings → Connectors → Add custom connector → Name: KeepContext → URL: this → Authentication: No sign-in, no headers.', secret],
       ['Or, with private access', `URL ${url} plus request header "Authorization" with this value (needs "Allow private entries").`, header]],
     'gemini-web': [['Gemini', 'Customise → Connectors → + Custom → paste this URL → Next.', secret]],
