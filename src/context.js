@@ -183,7 +183,8 @@ export function createApp({ preset, account = '', canPrivate = false } = {}) {
   const p = APP_PRESETS[preset];
   if (!p) throw new Error(`preset must be one of ${Object.keys(APP_PRESETS).join(', ')}`);
   const acct = String(account || '').trim().slice(0, 40);
-  const base = `${preset}${acct ? `-${acct.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : ''}`.replace(/-+$/, '');
+  const suffix = acct.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).join('-');
+  const base = suffix ? `${preset}-${suffix}` : preset;
   let slug = base;
   for (let i = 2; db.prepare('SELECT 1 FROM apps WHERE slug = ?').get(slug); i++) slug = `${base}-${i}`;
   const token = newToken();

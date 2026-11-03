@@ -658,3 +658,15 @@ test('demo mode: a fictional person with entries from several apps, a handed-off
     assert.equal((await get('/status')).owner, 'Alex Rivera');
   } finally { stop(); }
 });
+
+test('hardening: odd repo names are refused, responses are nosniff, connection names are tidy', async () => {
+  const r = await fetch(`${BASE}/api/context?repo=${encodeURIComponent('<script>alert(1)</script>')}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+  assert.equal(r.status, 400);
+  assert.ok(!(await r.text()).includes('<script>'));
+  assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal((await api('/activity?repo=a%20b')).status, 400);
+  assert.equal((await api('/activity?repo=notes-app')).status, 200);
+  const { data } = await api('/apps', { method: 'POST', body: { preset: 'cursor', account: '--My  Laptop!!--' } });
+  assert.equal(data.app.slug, 'cursor-my-laptop');
+  await api(`/apps/${data.app.id}`, { method: 'DELETE' });
+});

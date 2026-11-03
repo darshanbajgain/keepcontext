@@ -335,6 +335,7 @@ Details:
 - The session cookie is stateless: `HMAC-SHA256(ADMIN_PASSWORD, 'ui-session:' + HUB_TOKEN)` with `.env` secrets, or `HMAC-SHA256(session_secret, 'ui-session:' + password hash)` after the setup page, `HttpOnly`, `SameSite=Lax`, 30 days, `Secure` behind HTTPS. Changing either secret signs everyone out.
 - Private entries: `listEntries()` and `contextBundle()` exclude them unless `includePrivate: true`; `updateEntry()` treats them as missing unless `includePrivate: true`. `canSeePrivate(caller)` decides: the web UI always; the shared token or a connection with private access only over the `Authorization` header.
 - `/api/status` never returns secrets. Nothing logs tokens.
+- Every response sends `X-Content-Type-Options: nosniff`. The REST `repo` parameter must be a repository name (`[A-Za-z0-9._-]`, 400 otherwise), so it is never echoed as markup.
 - GitHub is read-only: only `GET` requests; the token needs read scopes only.
 - User data (commit messages, PR titles, entry text) is escaped in the UI with `esc()`, including in the Markdown preview, and is never treated as instructions.
 - `/mcp` allows CORS from any origin (auth is still required).
@@ -438,4 +439,5 @@ Principles that stay: business logic only in `context.js` (and a future `tasks.j
 
 ## 13. Change log
 
+- **2026-11-04:** v1.0.1: `repoParam()` validation and `nosniff` (CodeQL findings).
 - **2026-11-04:** v1.0.0, first public version (see `CHANGELOG.md`).

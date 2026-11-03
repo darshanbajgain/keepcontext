@@ -1,6 +1,6 @@
 {
   "name": "keepcontext",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Self-hosted memory shared by all your AI apps (Claude, ChatGPT, Gemini, Cursor, Codex, Copilot…) over MCP: ideas, decisions, todos, GitHub activity, and tasks any app can continue when another hits its limit.",
   "type": "module",
   "private": true,

@@ -4,6 +4,13 @@ All notable changes to KeepContext. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-04
+
+### Security
+
+- The `repo` parameter of the REST API only accepts repository names (letters, digits, `.`, `-`, `_`), so it can never be echoed back as markup; every response sends `X-Content-Type-Options: nosniff`. Found by CodeQL.
+- Connection names are built without a backtracking regular expression.
+
 ## [1.0.0] - 2026-11-04
 
 First public version: one self-hosted memory for every AI app, with tasks any app can continue.
@@ -30,5 +37,6 @@ First public version: one self-hosted memory for every AI app, with tasks any ap
 
 - Dependencies updated: body-parser (high) and fast-uri (moderate) advisories fixed.
 
-[Unreleased]: https://github.com/darshanbajgain/keepcontext/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/darshanbajgain/keepcontext/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/darshanbajgain/keepcontext/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/darshanbajgain/keepcontext/releases/tag/v1.0.0

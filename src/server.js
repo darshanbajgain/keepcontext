@@ -18,6 +18,8 @@ if (DEMO && seedDemo()) console.log('Demo mode: filled the hub with fictional da
 
 const app = express();
 app.disable('x-powered-by');
+// Browsers must not guess content types (e.g. render a Markdown or text response as HTML).
+app.use((req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); next(); });
 app.set('trust proxy', config.trustProxy);
 app.use(express.json({ limit: '1mb' }));
 
@@ -188,6 +190,13 @@ api.use((req, res, next) => {
     || (req.method === 'PATCH' && /^\/entries\/\d+$/.test(p));
   return ok ? next() : res.status(403).json({ error: 'This connection token can only use /api/context and /api/entries' });
 });
+// Repo names as GitHub allows them (letters, digits, '.', '-', '_'); anything else is refused, never echoed back.
+const repoParam = (req) => {
+  const r = req.query.repo;
+  if (r === undefined || r === '') return null;
+  if (typeof r !== 'string' || !/^[A-Za-z0-9._-]{1,100}$/.test(r)) throw new Error('repo must be a repository name');
+  return r;
+};
 const wrap = (fn) => async (req, res) => {
   try { res.json(await fn(req, res)); } catch (e) { res.status(400).json({ error: e.message }); }
 };
@@ -222,7 +231,7 @@ api.get('/status', wrap((req) => ({
 api.get('/sync-runs', wrap((req) => ctx.syncRuns({ limit: req.query.limit, notable: req.query.notable === '1' })));
 api.post('/sync', wrap(() => syncGithub()));
 api.post('/gdoc/push', wrap(() => pushGdoc({ force: true })));
-api.get('/activity', wrap((req) => ctx.activity({ days: Number(req.query.days) || 60, repo: req.query.repo || null })));
+api.get('/activity', wrap((req) => ctx.activity({ days: Number(req.query.days) || 60, repo: repoParam(req) })));
 api.get('/activity/unlogged', wrap((req) => ctx.workLogRows({ days: Number(req.query.days) || 60 })));
 api.post('/activity/mark-logged', wrap((req) => ({ marked: ctx.markLogged(req.body?.keys || []) })));
 api.get('/projects', wrap((req) => ctx.projects({ includeHidden: req.query.all === '1' })));
@@ -244,14 +253,16 @@ api.delete('/apps/:id', wrap((req) => ctx.revokeApp(Number(req.params.id))));
 api.get('/overview', wrap(() => ctx.overview()));
 // Continue-anywhere tasks (the web UI sees private ones too). Admin and web only, like every route outside /entries.
 const taskViewer = (res) => ({ app: res.locals.caller.slug, includePrivate: canSeePrivate(res.locals.caller) });
-api.get('/tasks', wrap((req, res) => ctx.listTasks({ status: req.query.status || 'active', repo: req.query.repo || null, limit: req.query.limit }, taskViewer(res))));
+api.get('/tasks', wrap((req, res) => ctx.listTasks({ status: req.query.status || 'active', repo: repoParam(req), limit: req.query.limit }, taskViewer(res))));
 api.get('/tasks/:id', wrap((req, res) => ctx.getTask(Number(req.params.id), taskViewer(res))));
 api.post('/tasks/:id/finish', wrap((req, res) => ctx.finishTask(Number(req.params.id), req.body || {}, taskViewer(res))));
 api.post('/tasks/:id/reopen', wrap((req, res) => ctx.reopenTask(Number(req.params.id), taskViewer(res))));
 api.get('/context', (req, res) => {
-  res.type('text/markdown').send(ctx.contextBundle({ repo: req.query.repo || null }));
+  let repo;
+  try { repo = repoParam(req); } catch (e) { return res.status(400).json({ error: e.message }); }
+  res.type('text/markdown').send(ctx.contextBundle({ repo }));
 });
-api.get('/repo-files', wrap((req) => ctx.repoContextFiles({ repo: req.query.repo || null, base: baseUrl(req) })));
+api.get('/repo-files', wrap((req) => ctx.repoContextFiles({ repo: repoParam(req), base: baseUrl(req) })));
 api.get('/export', wrap(() => ({
   exportedAt: new Date().toISOString(),
   entries: db.prepare('SELECT * FROM entries WHERE private = 0').all(), // private entries never leave via export
