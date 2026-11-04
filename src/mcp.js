@@ -172,7 +172,7 @@ export function buildMcpServer({ allowPrivate = false, caller = null, base } = {
       files: list('Paths touched'),
       decisions: list('Decisions made'),
       questions: list('Open questions for the user'),
-      commit: z.string().optional().describe('Latest commit sha on the branch'),
+      commit: z.string().optional().describe('Latest commit hash on the branch (output of `git rev-parse --short HEAD`, not the word HEAD)'),
       branch: z.string().optional().describe('Only if you moved to another branch'),
       reason: z.enum(['step', 'limit-warning']).optional().describe('limit-warning: you are close to your usage limit'),
     },

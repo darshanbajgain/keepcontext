@@ -303,7 +303,7 @@ Design and rationale: `docs/HANDOFF_PLAN.md`. An app that hits its usage limit c
 1. `start_task` creates the task, a branch name and a `start` checkpoint; the caller becomes the owner.
 2. `checkpoint_task` appends a checkpoint (summary, next steps, files, decisions, questions, commit; `reason: limit-warning` when near a limit) and makes the caller the owner. Refused on finished tasks until reopened.
 3. Every app sees open tasks in `get_context` (an "Open tasks" section with the last app, its summary and the next step) and through `list_open_tasks`.
-4. `resume_task` (by id, or the newest open task, optionally per repo) returns a Markdown brief: goal, where the last app stopped and its next steps, open questions, `git switch <branch>`, history (oldest first, without `resumed` rows), and for an app that worked on it before: what others did since its own last checkpoint plus `git diff <its last commit>..HEAD`. It warns if another app checkpointed in the last 10 minutes. If the task changes hands it records a `resumed` checkpoint and moves the owner; for a finished task it is a review only.
+4. `resume_task` (by id, or the newest open task, optionally per repo) returns a Markdown brief: goal, where the last app stopped and its next steps, open questions, `git switch <branch>`, history (oldest first, without `resumed` rows), and for an app that worked on it before: what others did since its own last checkpoint plus `git diff <its last commit>..HEAD`. It warns if another app checkpointed in the last 10 minutes. If the task changes hands it records a `resumed` checkpoint and moves the owner; for a finished task it is a review only. `checkpoint_task` from an app that isn't the owner records the same `resumed` row first, so a handoff shows even when the app skipped `resume_task`. `commit` is kept only if it looks like a commit hash (7–40 hex characters); `HEAD` or a branch name is dropped.
 5. `finish_task` (done or abandoned, with a result). The UI can reopen.
 
 Visibility (`canSeeTask()`): public tasks for everyone; private ones for the web UI, callers allowed private context (header + private access), and connections that worked on the task, never over the secret URL. Activity: one `Task` row per task per day (`task:<id>:<date>`, apps in order, checkpoint count), never for private tasks and never in the work log rows (`isGithubRow()`). UI: **Tasks** tab (filter by status, timeline per task with app badges, done / abandon / reopen), Overview **Active tasks** card (idle after 2 hours without a checkpoint).
@@ -439,5 +439,6 @@ Principles that stay: business logic only in `context.js` (and a future `tasks.j
 
 ## 13. Change log
 
+- **2026-11-05:** Tasks: `checkpoint_task` by a non-owner records the handoff (`resumed`); checkpoint commits must be hashes.
 - **2026-11-04:** v1.0.1: `repoParam()` validation and `nosniff` (CodeQL findings).
 - **2026-11-04:** v1.0.0, first public version (see `CHANGELOG.md`).

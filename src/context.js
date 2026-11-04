@@ -481,12 +481,14 @@ function taskOut(t, { checkpoints = false } = {}) {
     ...(checkpoints ? { checkpoints: cps.map((c) => cpOut(c, who)) } : {}),
   };
 }
+// Only a real commit hash is kept: "HEAD" or a branch name would make the review diff point at the wrong code.
+const commitSha = (c) => (typeof c === 'string' && /^[0-9a-f]{7,40}$/i.test(c.trim()) ? c.trim() : null);
 function addCheckpoint(taskId, app, cp) {
   const at = now();
   db.prepare(`INSERT INTO task_checkpoints(task_id, app, at, reason, summary, done, next, files, decisions, questions, commit_sha, branch)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(taskId, app, at, cp.reason || 'step', String(cp.summary || '').trim() || '(no summary)',
     JSON.stringify(strList(cp.done)), JSON.stringify(strList(cp.next)), JSON.stringify(strList(cp.files)),
-    JSON.stringify(strList(cp.decisions)), JSON.stringify(strList(cp.questions)), cp.commit || null, cp.branch || null);
+    JSON.stringify(strList(cp.decisions)), JSON.stringify(strList(cp.questions)), commitSha(cp.commit), cp.branch || null);
   db.prepare('UPDATE tasks SET owner = ?, updated_at = ?, branch = coalesce(?, branch) WHERE id = ?').run(app, at, cp.branch || null, taskId);
 }
 
@@ -508,6 +510,10 @@ export function startTask({ title, goal = '', repo = null, branch = null, privat
 export function checkpointTask(id, cp = {}, viewer = {}) {
   const t = visibleTask(id, viewer);
   if (t.status !== 'active') throw new Error(`Task ${id} is ${t.status}. Reopen it in the web UI (Tasks tab) before adding checkpoints.`);
+  // An app that continues without calling resume_task still took the task over: record the handoff.
+  if (viewer.app && t.owner !== viewer.app) {
+    addCheckpoint(t.id, viewer.app, { reason: 'resumed', summary: `Resumed by ${appResolver()(viewer.app)?.name || viewer.app}` });
+  }
   addCheckpoint(t.id, viewer.app || null, { ...cp, reason: cp.reason === 'limit-warning' ? 'limit-warning' : 'step' });
   return taskOut(visibleTask(t.id, { includePrivate: true }));
 }

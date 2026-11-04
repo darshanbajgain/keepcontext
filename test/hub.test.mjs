@@ -548,6 +548,17 @@ test('tasks: one app starts, another resumes from the last checkpoint, the first
   assert.match(row.summary, /Audit log": Claude Code · tasks → Codex · tasks → .*checkpoints \(finished\)/);
   assert.ok(!(await api('/activity/unlogged')).data.events.some((r) => r.type === 'Task'));
 
+  // An app that checkpoints without calling resume_task still records the handoff; "HEAD" is not kept as a commit.
+  const s = await call(a, 'start_task', { title: 'Skip resume', repo: 'notes-app' });
+  await call(b, 'checkpoint_task', { task_id: s.id, summary: 'Did a step', commit: 'HEAD' });
+  const sk = (await api(`/tasks/${s.id}`)).data;
+  assert.deepEqual(sk.checkpoints.map((c) => c.reason), ['start', 'resumed', 'step']);
+  assert.equal(sk.owner.slug, 'codex-tasks');
+  assert.equal(sk.checkpoints.at(-1).commit, null);
+  await call(b, 'checkpoint_task', { task_id: s.id, summary: 'Another step', commit: 'DEF5678' });
+  assert.equal((await api(`/tasks/${s.id}`)).data.checkpoints.filter((c) => c.reason === 'resumed').length, 1);
+  await call(b, 'finish_task', { task_id: s.id, summary: 'ok' });
+
   // A repo the hub doesn't sync (company work) is private: the creator and connections with private access see it,
   // other connections and the secret URL never do.
   const p = await call(a, 'start_task', { title: 'Company refactor', repo: 'acme-billing' });
