@@ -233,3 +233,14 @@ a.button { display: inline-block; background: var(--accent); color: var(--accent
 .steps { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 8px; }
 .steps li.done { color: var(--muted); }
 .getstarted { border-color: var(--accent); }
+
+/* Public access (Settings) */
+.ok { color: #2e7d32; }
+@media (prefers-color-scheme: dark) { .ok { color: #8fd694; } }
+.tunnel-modes { display: grid; gap: 10px; margin: 6px 0 14px; }
+.tunnel-modes label.check { align-items: flex-start; }
+.tunnel-modes label.check input { margin-top: 5px; flex: none; width: auto; }
+.cf-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-left: 26px; }
+@media (max-width: 700px) { .cf-fields { grid-template-columns: 1fr; margin-left: 0; } }
+#tunnelState { margin: 4px 0 10px; }
+#tunnelState code { word-break: break-all; }

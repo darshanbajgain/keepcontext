@@ -46,4 +46,7 @@ jobs:
           [ "$(docker exec kc id -un)" = node ]
           curl -fsS http://localhost:8787/ | grep -q "Welcome to KeepContext"
           docker logs kc | grep -q "setup code CI123"
+          # Public access: cloudflared is in the image and runs as the unprivileged user, with CA certificates.
+          docker exec kc cloudflared --version
+          docker exec kc test -s /etc/ssl/certs/ca-certificates.crt
           docker stop kc

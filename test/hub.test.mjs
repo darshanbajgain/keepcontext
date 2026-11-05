@@ -681,3 +681,76 @@ test('hardening: odd repo names are refused, responses are nosniff, connection n
   assert.equal(data.app.slug, 'cursor-my-laptop');
   await api(`/apps/${data.app.id}`, { method: 'DELETE' });
 });
+
+test('public access: built-in tunnel (quick and Cloudflare token), public links, token never returned', async () => {
+  const fake = path.resolve(import.meta.dirname, 'fake-cloudflared.mjs');
+  const { base, stop } = await freshHub(HUB_PORT - 4, { HUB_TOKEN: TOKEN, ADMIN_PASSWORD: ADMIN_PW, CLOUDFLARED_BIN: fake, TUNNEL_CHECK_TRIES: '1' });
+  const call = (p, opts = {}) => fetch(`${base}/api${p}`, {
+    ...opts, headers: { Authorization: `Bearer ${opts.token || TOKEN}`, 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  }).then(async (r) => ({ status: r.status, data: await r.json().catch(() => null) }));
+  const until = async (fn) => { for (let i = 0; i < 50; i++) { const v = await fn(); if (v) return v; await new Promise((r) => setTimeout(r, 100)); } throw new Error('timed out'); };
+  try {
+    // Off by default: the address is local, and the UI is told so.
+    let s = (await call('/status')).data;
+    assert.equal(s.tunnel.mode, 'off');
+    assert.equal(s.tunnel.cloudflared, true);
+    assert.equal(s.publicUrlLocal, true);
+
+    // Connection tokens can't touch it.
+    const { data: conn } = await call('/apps', { method: 'POST', body: { preset: 'chatgpt' } });
+    assert.equal((await call('/tunnel', { method: 'PUT', body: { mode: 'quick' }, token: conn.token })).status, 403);
+
+    // Quick tunnel: its https address becomes the public URL for links and connect.sh.
+    assert.equal((await call('/tunnel', { method: 'PUT', body: { mode: 'quick' } })).status, 200);
+    const first = await until(async () => { const t = (await call('/tunnel')).data; return t.status === 'running' && t.url; });
+    assert.match(first, /^https:\/\/fake-[a-z0-9]+\.trycloudflare\.com$/);
+    s = (await call('/status')).data;
+    assert.equal(s.publicUrl, first);
+    assert.equal(s.publicUrlLocal, false);
+    assert.ok((await (await fetch(`${base}/connect.sh`)).text()).includes(first));
+    await until(async () => (await call('/tunnel')).data.checkedAt);
+    assert.equal((await call('/tunnel')).data.reachable, false, 'the fake address does not resolve');
+
+    // A restart gets a new quick address: the UI is told the old one changed, until dismissed.
+    await call('/tunnel', { method: 'PUT', body: { mode: 'quick' } });
+    const second = await until(async () => { const t = (await call('/tunnel')).data; return t.status === 'running' && t.url !== first && t.url; });
+    assert.equal((await call('/tunnel')).data.changedFrom, first);
+    assert.equal((await call('/tunnel/ack', { method: 'POST' })).data.changedFrom, null);
+    assert.ok(second);
+
+    // Cloudflare tunnel: needs a token and a hostname; the token is passed by env and never returned.
+    assert.equal((await call('/tunnel', { method: 'PUT', body: { mode: 'cloudflare', hostname: 'kc.example.com' } })).status, 400);
+    assert.equal((await call('/tunnel', { method: 'PUT', body: { mode: 'cloudflare', token: 'cf-test-token-padding-x', hostname: 'not a host' } })).status, 400);
+    const bad = await call('/tunnel', { method: 'PUT', body: { mode: 'cloudflare', token: 'wrong-token-but-long-enough', hostname: 'kc.example.com' } });
+    assert.equal(bad.status, 200);
+    const err = await until(async () => { const t = (await call('/tunnel')).data; return t.status === 'error' && t.error; });
+    assert.match(err, /not valid/);
+    await call('/tunnel', { method: 'PUT', body: { mode: 'cloudflare', token: 'cf-test-token-0123456789', hostname: 'https://KC.example.com/' } });
+    await until(async () => (await call('/tunnel')).data.status === 'running');
+    const t = (await call('/tunnel')).data;
+    assert.equal(t.url, 'https://kc.example.com');
+    assert.equal(t.hasToken, true);
+    assert.equal(t.changedFrom, null, 'a fixed address is not a "changed" quick address');
+    for (const r of [await call('/tunnel'), await call('/status'), await call('/settings')]) assert.ok(!JSON.stringify(r.data).includes('cf-test-token'));
+    // An empty token keeps the saved one.
+    await call('/tunnel', { method: 'PUT', body: { mode: 'cloudflare', token: '', hostname: 'kc.example.com' } });
+    await until(async () => (await call('/tunnel')).data.status === 'running');
+
+    // Off: back to the local address.
+    assert.equal((await call('/tunnel', { method: 'PUT', body: { mode: 'off' } })).data.status, 'off');
+    s = (await call('/status')).data;
+    assert.equal(s.publicUrl, base);
+    assert.equal(s.publicUrlLocal, true);
+  } finally { stop(); }
+
+  // TUNNEL in .env: starts with the server and is locked in the UI.
+  const env = await freshHub(HUB_PORT - 5, { HUB_TOKEN: TOKEN, ADMIN_PASSWORD: ADMIN_PW, CLOUDFLARED_BIN: fake, TUNNEL: 'quick', TUNNEL_CHECK_TRIES: '1' });
+  try {
+    const get = async () => (await fetch(`${env.base}/api/tunnel`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json();
+    await until(async () => (await get()).status === 'running');
+    assert.equal((await get()).fromEnv.mode, true);
+    const r = await fetch(`${env.base}/api/tunnel`, { method: 'PUT', headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: '{"mode":"off"}' });
+    assert.equal(r.status, 400);
+  } finally { env.stop(); }
+});
