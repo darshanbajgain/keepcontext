@@ -54,6 +54,8 @@ export const config = {
     loginFailsTotal: Number(env.LOGIN_MAX_FAILS_TOTAL ?? 50),
     badTokensPerIp: Number(env.BAD_TOKEN_MAX ?? 30),
     perMinute: Number(env.RATE_LIMIT_PER_MINUTE ?? 600),
+    // Public access: starting/stopping the tunnel and checking it from the internet, per caller per minute.
+    tunnelPerMinute: Number(env.TUNNEL_ACTIONS_PER_MINUTE ?? 10),
   },
   // Google Doc mirror (off unless GOOGLE_DOC_ID is set). Auth: the key file if it exists, else keyless on a Google Cloud VM.
   gdoc: {

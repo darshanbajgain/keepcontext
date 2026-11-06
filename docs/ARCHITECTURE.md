@@ -332,6 +332,7 @@ Details:
 - Rate limits (`src/ratelimit.js`, in memory, reset on restart; `0` turns one off):
   - **Failed logins:** `LOGIN_MAX_FAILS` (10) per IP and `LOGIN_MAX_FAILS_TOTAL` (50) in total per 15 minutes. Checked before the password, so a guess while blocked reveals nothing; the login page says to wait. Browsers already signed in are unaffected.
   - **Wrong tokens or cookies** on `/api`, `/mcp` and `/mcp/k/:token`: `BAD_TOKEN_MAX` (30) per IP per 15 minutes, then `429` with `Retry-After`. A valid token is never refused by this, so guessing from a shared IP can't lock the real apps out.
+  - **Tunnel actions** (`PUT /api/tunnel`, `POST /api/tunnel/check`, which start `cloudflared` or call out to the internet): `TUNNEL_ACTIONS_PER_MINUTE` (10) per caller.
   - **Requests per caller** (connection slug, `shared-token` or `web`, not IP): `RATE_LIMIT_PER_MINUTE` (600), then `429`. Stops one runaway agent from flooding the hub.
   - The client IP comes from `X-Forwarded-For` only when the connection is from a trusted proxy (`TRUST_PROXY`, default `loopback`: Tailscale Funnel, cloudflared, Caddy on the same machine), so clients can't fake it.
 - The session cookie is stateless: `HMAC-SHA256(ADMIN_PASSWORD, 'ui-session:' + HUB_TOKEN)` with `.env` secrets, or `HMAC-SHA256(session_secret, 'ui-session:' + password hash)` after the setup page, `HttpOnly`, `SameSite=Lax`, 30 days, `Secure` behind HTTPS. Changing either secret signs everyone out.
@@ -376,6 +377,7 @@ Details:
 | `LOGIN_MAX_FAILS` / `LOGIN_MAX_FAILS_TOTAL` | 10 / 50 | Failed logins per IP / in total per 15 min (0 = off) |
 | `BAD_TOKEN_MAX` | 30 | Wrong tokens per IP per 15 min before `429` (0 = off) |
 | `RATE_LIMIT_PER_MINUTE` | 600 | Requests per minute per app (0 = off) |
+| `TUNNEL_ACTIONS_PER_MINUTE` | 10 | Tunnel start/stop and reachability checks per caller per minute (0 = off) |
 
 ## 8. Testing
 

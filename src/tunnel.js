@@ -35,7 +35,10 @@ const hostname = () => env.TUNNEL_HOSTNAME || kvGet('tunnel_hostname', '') || ''
 
 /** "keepcontext.example.com" (with or without https:// and a trailing slash) → "https://keepcontext.example.com". */
 export function normalizeHostname(h) {
-  const host = String(h || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase();
+  // Plain string steps (no regex on the raw input, which could be long): cap, drop the scheme and trailing slashes.
+  let host = String(h || '').trim().slice(0, 300).toLowerCase();
+  for (const scheme of ['https://', 'http://']) if (host.startsWith(scheme)) host = host.slice(scheme.length);
+  while (host.endsWith('/')) host = host.slice(0, -1);
   if (!/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)) {
     throw new Error('Enter the public hostname you set up in Cloudflare, e.g. keepcontext.example.com');
   }

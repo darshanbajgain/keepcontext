@@ -216,9 +216,12 @@ api.delete('/settings/github', wrap(() => S.disconnectGithub()));
 api.post('/settings/password', wrap((req) => S.changePassword(req.body || {})));
 api.post('/settings/admin-token', wrap(() => S.rotateAdminToken()));
 // Public access (built-in cloudflared tunnel). The tunnel token is write-only: never in a response.
+// Starting cloudflared or checking the address from the internet is costly: a tighter limit than the per-app one.
+const tunnelActions = limiter({ limit: RL.tunnelPerMinute, windowMs: 60e3 });
+const limitTunnel = (req, res, next) => { const s = tunnelActions.hit(res.locals.caller.slug); return s ? tooMany(res, s) : next(); };
 api.get('/tunnel', wrap(() => T.status()));
-api.put('/tunnel', wrap((req) => T.configure(req.body || {})));
-api.post('/tunnel/check', wrap(() => T.check()));
+api.put('/tunnel', limitTunnel, wrap((req) => T.configure(req.body || {})));
+api.post('/tunnel/check', limitTunnel, wrap(() => T.check()));
 api.post('/tunnel/ack', wrap(() => T.ackChange()));
 
 api.get('/status', wrap((req) => ({
