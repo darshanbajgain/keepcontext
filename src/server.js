@@ -11,6 +11,7 @@ import { buildMcpServer } from './mcp.js';
 import { gdocStatus, pushGdoc, startGdocMirror } from './gdoc.js';
 import { limiter } from './ratelimit.js';
 import * as S from './settings.js';
+import * as T from './tunnel.js';
 import { seedDemo, DEMO_PASSWORD } from './demo.js';
 
 const DEMO = process.env.DEMO === '1';
@@ -23,12 +24,18 @@ app.use((req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); next
 app.set('trust proxy', config.trustProxy);
 app.use(express.json({ limit: '1mb' }));
 
+/** localhost / 127.x / 0.0.0.0 / [::1]: fine for apps on this computer, unreachable for web apps. */
+const isLocalUrl = (u) => /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i.test(u);
+
 /**
- * The hub's public address for snippets: PUBLIC_URL if set, else the address this request came in on (a tunnel's
- * https://… host via the trusted proxy headers, or localhost). Odd Host headers fall back to PUBLIC_URL's default.
+ * The hub's public address for snippets, in order: the built-in tunnel while it runs (src/tunnel.js); PUBLIC_URL
+ * if it isn't a local address; the address this request came in on (an outside tunnel's https://… host via the
+ * trusted proxy headers, or localhost). Odd Host headers fall back to PUBLIC_URL's default.
  */
 function baseUrl(req) {
-  if (config.publicUrlSet) return config.publicUrl;
+  const t = T.publicUrl();
+  if (t) return t;
+  if (config.publicUrlSet && !isLocalUrl(config.publicUrl)) return config.publicUrl;
   const host = req.host || '';
   return /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? `${req.protocol}://${host}` : config.publicUrl;
 }
@@ -208,6 +215,14 @@ api.post('/settings/github', wrap((req) => S.connectGithub(req.body?.token)));
 api.delete('/settings/github', wrap(() => S.disconnectGithub()));
 api.post('/settings/password', wrap((req) => S.changePassword(req.body || {})));
 api.post('/settings/admin-token', wrap(() => S.rotateAdminToken()));
+// Public access (built-in cloudflared tunnel). The tunnel token is write-only: never in a response.
+// Starting cloudflared or checking the address from the internet is costly: a tighter limit than the per-app one.
+const tunnelActions = limiter({ limit: RL.tunnelPerMinute, windowMs: 60e3 });
+const limitTunnel = (req, res, next) => { const s = tunnelActions.hit(res.locals.caller.slug); return s ? tooMany(res, s) : next(); };
+api.get('/tunnel', wrap(() => T.status()));
+api.put('/tunnel', limitTunnel, wrap((req) => T.configure(req.body || {})));
+api.post('/tunnel/check', limitTunnel, wrap(() => T.check()));
+api.post('/tunnel/ack', wrap(() => T.ackChange()));
 
 api.get('/status', wrap((req) => ({
   owner: config.ownerName,
@@ -218,6 +233,9 @@ api.get('/status', wrap((req) => ({
   lastSyncAt: kvGet('last_sync_at'),
   timezone: config.timezone,
   publicUrl: baseUrl(req),
+  // true: web apps (ChatGPT, Claude, Gemini) can't reach this address; the UI points to Settings → Public access.
+  publicUrlLocal: isLocalUrl(baseUrl(req)),
+  tunnel: T.status(),
   autoSyncMinutes: config.autoSyncMinutes,
   gdoc: gdocStatus(),
   counts: {
@@ -284,6 +302,11 @@ const httpServer = app.listen(config.port, () => {
   const code = S.setupCodeForLog();
   if (code) console.log(`\nFirst-run setup: open ${config.publicUrl} and enter the setup code ${code}\n`);
   if (startGdocMirror()) console.log('Google Doc mirror on');
+  // Public access: start the tunnel again if it was on (Settings → Public access, or TUNNEL in .env).
+  if (T.status().mode !== 'off') {
+    T.start();
+    console.log('Public access: starting the tunnel (address in Settings → Public access)');
+  }
 });
 
 if (config.autoSyncMinutes > 0) {
@@ -300,6 +323,7 @@ if (config.autoSyncMinutes > 0) {
 // Clean stop (docker stop, Ctrl+C, systemd): finish open requests, then close the database so its WAL is merged.
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.once(sig, () => {
+    T.stop();
     httpServer.close();
     setTimeout(() => { try { db.close(); } catch {} process.exit(0); }, 300).unref();
   });

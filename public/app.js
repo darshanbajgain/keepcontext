@@ -103,6 +103,7 @@ async function loadStatus() {
   $('#connectGh').hidden = status.githubConfigured || status.demo;
   showSyncErr(status.sync);
   showGdoc(status.gdoc);
+  showPublicAccess();
   const repos = await api('/projects?all=1');
   $('#repoList').innerHTML = repos.map((r) => `<option value="${esc(r.name)}">`).join('');
 }
@@ -132,6 +133,10 @@ $('#syncBtn').addEventListener('click', async () => {
 });
 
 /* ---------- settings ---------- */
+const settingsAction = (fn) => async (ev) => {
+  ev.preventDefault?.();
+  try { await fn(ev); } catch (e) { toast(e.message, true); }
+};
 async function loadSettings() {
   const s = await api('/settings');
   const pf = $('#profileForm');
@@ -147,11 +152,78 @@ async function loadSettings() {
   $('#pwForm').hidden = s.fromEnv.password;
   $('#rotateAdmin').hidden = s.fromEnv.hubToken;
   $('#adminEnv').hidden = !s.fromEnv.hubToken;
+  await loadTunnel();
 }
-const settingsAction = (fn) => async (ev) => {
-  ev.preventDefault?.();
-  try { await fn(ev); } catch (e) { toast(e.message, true); }
-};
+
+/* ---------- public access (built-in tunnel, src/tunnel.js) ---------- */
+// Header notice and the Apps-tab warnings, from /api/status.
+function showPublicAccess() {
+  const t = status.tunnel || {};
+  const note = t.changedFrom ? 'Public address changed'
+    : t.mode !== 'off' && (t.status === 'error' || t.status === 'unavailable') ? 'Public access down' : '';
+  $('#tunnelNote').hidden = !note;
+  $('#tunnelNote').textContent = note ? `⚠ ${note}` : '';
+  $$('.local-warn').forEach((p) => (p.hidden = !status.publicUrlLocal));
+  $$('.local-url').forEach((c) => (c.textContent = status.publicUrl));
+}
+let tunnelTimer;
+function renderTunnel(t) {
+  const reach = t.reachable === true ? '<span class="ok">✓ reachable from the internet</span>'
+    : t.checking ? '<span class="muted">checking from the internet… (a new address can take a minute or two)</span>'
+    : t.reachable === false ? '<span class="bad">not reachable from the internet. Try “Test again” in a minute.</span>' : '<span class="muted">checking…</span>';
+  const lines = {
+    off: `<strong>Local only:</strong> <code>${esc(location.origin)}</code>. Apps on this computer can connect; web apps can't.`,
+    starting: '<span class="muted">Starting the tunnel…</span>',
+    running: `<strong>Public at</strong> <code>${esc(t.url || '')}</code> · ${reach}${t.mode === 'quick'
+      ? '<div class="muted small">This address changes when KeepContext restarts. For one that stays, use a Cloudflare tunnel with your domain (or Tailscale Funnel).</div>' : ''}`,
+    error: `<span class="bad">⚠ ${esc(t.error || 'The tunnel stopped.')}</span>`,
+    unavailable: `<span class="bad">⚠ ${esc(t.error || "cloudflared isn't installed here.")}</span>`,
+  };
+  const changed = t.changedFrom && t.url ? `<p class="warn">The public address changed from <code>${esc(t.changedFrom)}</code>. Web apps still using the old one stop working:
+    in ChatGPT, Claude and Gemini, change the start of the link to <code>${esc(t.url)}</code> (the <code>/mcp/k/…</code> part stays the same), or rotate the connection in the Apps tab for a new link.
+    <button class="link" id="tunnelAck">Done</button></p>` : '';
+  $('#tunnelState').innerHTML = (lines[t.status] || '') + changed;
+  const f = $('#tunnelForm');
+  if (!f.contains(document.activeElement)) {
+    f.querySelectorAll('input[name=mode]').forEach((r) => (r.checked = r.value === t.mode));
+    f.hostname.value = t.hostname || '';
+  }
+  f.token.placeholder = t.hasToken ? 'Saved. Leave empty to keep it' : 'eyJh…';
+  $('#cfFields').hidden = f.querySelector('input[name=mode]:checked')?.value !== 'cloudflare';
+  f.querySelectorAll('input, button').forEach((el) => (el.disabled = !!t.fromEnv?.mode));
+  $('#tunnelEnv').hidden = !t.fromEnv?.mode;
+  $('#tunnelMissing').hidden = t.cloudflared !== false;
+  $('#tunnelCheck').hidden = t.status !== 'running';
+  // Keep refreshing while it starts or the first reachability check runs.
+  clearTimeout(tunnelTimer);
+  if (t.status === 'starting' || t.checking || (t.status === 'error' && t.mode !== 'off')) {
+    tunnelTimer = setTimeout(() => loadTunnel().catch(() => {}), 2000);
+  }
+}
+async function loadTunnel() {
+  const t = await api('/tunnel');
+  renderTunnel(t);
+  if ((status.tunnel?.url || null) !== (t.url || null) || status.tunnel?.status !== t.status || status.tunnel?.changedFrom !== t.changedFrom) await loadStatus();
+}
+$('#tunnelForm').addEventListener('change', (ev) => {
+  if (ev.target.name === 'mode') $('#cfFields').hidden = ev.target.value !== 'cloudflare';
+});
+$('#tunnelForm').addEventListener('submit', settingsAction(async (ev) => {
+  const f = ev.target;
+  const mode = f.querySelector('input[name=mode]:checked')?.value || 'off';
+  const t = await api('/tunnel', { method: 'PUT', body: { mode, token: f.token.value, hostname: f.hostname.value } });
+  f.token.value = '';
+  toast(mode === 'off' ? 'Public access off' : 'Starting the tunnel…');
+  renderTunnel(t); await loadStatus();
+}));
+$('#tunnelCheck').addEventListener('click', settingsAction(async () => {
+  $('#tunnelState').querySelector('.ok, .bad')?.replaceWith(Object.assign(document.createElement('span'), { className: 'muted', textContent: 'checking from the internet…' }));
+  renderTunnel(await api('/tunnel/check', { method: 'POST' }));
+}));
+$('#tunnelState').addEventListener('click', settingsAction(async (ev) => {
+  if (ev.target.id !== 'tunnelAck') return;
+  renderTunnel(await api('/tunnel/ack', { method: 'POST' })); await loadStatus();
+}));
 $('#profileForm').addEventListener('submit', settingsAction(async (ev) => {
   const f = ev.target;
   await api('/settings', { method: 'PATCH', body: { ownerName: f.ownerName.value, timezone: f.timezone.value } });
@@ -187,7 +259,9 @@ async function loadOverview() {
   const o = await api('/overview');
   // First steps for a new hub; hidden once apps are connected and GitHub is connected (or skipped).
   let skipGh = false; try { skipGh = localStorage.getItem('skipGithub') === '1'; } catch {}
+  let skipPublic = false; try { skipPublic = localStorage.getItem('skipPublic') === '1'; } catch {}
   const steps = [
+    { done: !status.publicUrlLocal || skipPublic, html: 'Using ChatGPT, Claude or Gemini on the web? Give KeepContext a public address: <button class="link" data-goto="settings">Settings → Public access</button> <button class="link muted" id="skipPublic">skip, I only use apps on this computer</button>' },
     { done: o.apps.length > 0, html: 'Connect your AI apps: <button class="link" data-goto="connect">Apps tab →</button> (one connection per app and account)' },
     { done: status.githubConfigured || skipGh, html: 'Optional: connect GitHub for an activity log of your repos: <button class="link" data-goto="settings">Settings →</button> <button class="link muted" id="skipGh">skip</button>' },
     { done: o.apps.length > 0 && !!o.byApp.find((a) => a.slug !== 'web'), html: 'Ask any connected app to "save an idea to KeepContext", then see it here.' },
@@ -195,6 +269,7 @@ async function loadOverview() {
   $('#getStarted').hidden = status.demo || steps.every((s) => s.done);
   $('#gsSteps').innerHTML = steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? '✓ ' : ''}${s.html}</li>`).join('');
   $('#skipGh')?.addEventListener('click', () => { try { localStorage.setItem('skipGithub', '1'); } catch {} loadOverview(); });
+  $('#skipPublic')?.addEventListener('click', () => { try { localStorage.setItem('skipPublic', '1'); } catch {} loadOverview(); });
   const c = (k, s = 'open') => o.counts[k]?.[s] || 0;
   const tiles = [
     ['Open todos', c('todo'), 'todo'], ['Ideas', c('idea'), 'idea'], ['Notes', c('note'), 'note'],

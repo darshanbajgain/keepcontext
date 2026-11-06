@@ -1,5 +1,7 @@
 # KeepContext with Docker Compose.
 #   Local only (http://localhost:8787):      docker compose up -d
+#   Public HTTPS for ChatGPT / Claude web / Gemini: easiest is Settings → Public access in the web UI (built-in
+#   tunnel, nothing to add here). The profiles below are the older, file-based alternatives:
 #   + instant public HTTPS (changes on restart, for trying ChatGPT / Claude web / Gemini):
 #                                             docker compose --profile quick-tunnel up -d
 #   + fixed public HTTPS via Tailscale Funnel (free account; set TS_AUTHKEY in .env):

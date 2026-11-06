@@ -30,7 +30,8 @@ Self-hosted Node app that stores personal context (ideas, notes, decisions, todo
 | `scripts/` | CLI sync, repo inject, `vm-setup.sh` (VM setup), `deploy.sh` (server update with health check and rollback), `rotate-token-local.sh` (shared token), `connect-app.sh` (one connection token into one local app), `backup.sh` / `restore.sh` (snapshots) |
 | `test/` | `node:test` e2e suite + fake GitHub + fake Google |
 | `.github/workflows/` | `ci.yml` (tests on Node 22/24/26, Docker image starts), `release.yml` (GitHub Release on a version tag), `docker.yml` (multi-arch image to ghcr.io on a version tag), `codeql.yml` |
-| `Dockerfile`, `docker-compose.yml`, `docker/` | Image (non-root, health check) and compose with optional `quick-tunnel` / `tailscale` profiles |
+| `src/tunnel.js` | Public access: runs `cloudflared` (quick tunnel or a Cloudflare Tunnel token), reads its address, checks it from the internet, restarts it |
+| `Dockerfile`, `docker-compose.yml`, `docker/` | Image (non-root, health check, pinned `cloudflared`) and compose with optional `quick-tunnel` / `tailscale` profiles |
 | `docs/SELF_HOSTING.md` | Docker, tunnels, VPS, backups and restore (keep in sync with the compose file and scripts) |
 | `docs/CONNECT_APPS.md` | User guide for connecting apps (keep in sync with the Apps tab and `scripts/connect-app.sh`) |
 | `docs/ARCHITECTURE.md` | Architecture and codebase guide: flows, data model, security model, config, design decisions |

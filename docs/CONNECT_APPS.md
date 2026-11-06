@@ -37,6 +37,8 @@ Where the app keeps its token depends on the app:
 
 ### Web apps: ChatGPT, Claude, Gemini (one connection per account)
 
+Web apps connect from their own servers, so the secret URL must start with a **public HTTPS address**, not `http://localhost`. If the Apps tab warns about `localhost`, turn on **Settings → Public access** first (one click), then create the connection ([details](SELF_HOSTING.md#public-https)).
+
 Sign in to the right account first, then paste the **secret URL** from the card:
 
 | App | Where |
@@ -100,6 +102,8 @@ Rules of thumb: never paste a token or secret URL into a chat, a screenshot or a
 
 | You see | Cause | Fix |
 | --- | --- | --- |
+| ChatGPT: "Some app settings were rejected. Check the server URL…" (or Claude/Gemini can't connect) | The secret URL starts with `http://localhost`, which their servers can't reach | Settings → Public access → turn it on, then **Rotate** the connection in the Apps tab and paste the new `https://…` link |
+| Web apps stopped working after a restart | A quick tunnel's address changes on every restart (the header says "Public address changed") | Settings → Public access shows the new address: change the start of the link in each web app, or rotate the connection. For an address that stays, use a Cloudflare tunnel or Tailscale Funnel |
 | VS Code: "The MCP server keepcontext requires authentication. Authenticate?" | The token it has is old or wrong (the hub answered 401), so VS Code offers its own sign-in, which the hub doesn't use | **Cancel**, create a Copilot connection, `… \| bash -s copilot`, restart the server |
 | The app says the hub tools aren't connected | Not restarted, wrong token, or (Gemini CLI) untrusted folder | Restart the app; check its MCP list (`/mcp` in Claude/Gemini/Codex, Settings → MCP in Cursor, Manage MCP Servers in Antigravity) |
 | An agent "updated the hub" but nothing changed on the website | It wrote to a local file instead of using the MCP tools | Make sure the app's MCP list shows `keepcontext` connected; global instructions tell agents never to use a local database |

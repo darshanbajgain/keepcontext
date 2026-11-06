@@ -78,6 +78,7 @@ flowchart LR
 | `src/gdoc.js` | Google Doc mirror: service-account sign-in (keyless via the VM metadata server, or a JSON key with a JWT signed by `node:crypto`), renders `mirrorModel()` into Docs formatting requests (`renderDoc()`), debounced auto-push on change events | `startGdocMirror()`, `pushGdoc({ force })`, `gdocStatus()`, `renderDoc()` |
 | `src/mcp.js` | Builds an MCP server per request and registers the 17 tools (zod input schemas, annotations), including the five task tools | `buildMcpServer({ allowPrivate, caller })` |
 | `src/server.js` | Express app: auth, rate limits, login/logout, MCP routes, REST routes, static UI, auto-sync timer | (entry point) |
+| `src/tunnel.js` | Public access: runs `cloudflared` as a child process (quick tunnel, or a named Cloudflare Tunnel with the token passed by environment), reads its address from the output, checks `<address>/healthz` from the internet with growing gaps, restarts it with backoff, starts it again with the server; mode in `kv` or `TUNNEL` | `start()`, `stop()`, `configure()`, `check()`, `status()`, `publicUrl()` |
 | `src/ratelimit.js` | In-memory fixed-window counters (no dependency) used by `server.js` for failed logins, wrong tokens and requests per app | `limiter({ limit, windowMs })` |
 | `public/index.html` | The single-page UI: 8 tabs (Overview with a Get started checklist, Context, Tasks, Activity log with CSV export, Projects, Apps, Repo files, Settings) | |
 | `public/app.js` | Vanilla JS for the UI: `api()` fetch wrapper, tab loaders, Overview dashboard, entry cards (Markdown details, source badge, show more), client-side filters (search, kind, status, source app, tag chips). Context tab layout: filtered list first, add/edit form in a sticky side column, full-width agent-bundle preview below; Overview metric cards open the matching list, Markdown renderer (`mdToHtml`), `esc()` for escaping | |
@@ -101,10 +102,11 @@ flowchart LR
 | `scripts/inject.mjs` | `npm run inject -- <dir>`: writes AGENTS.md / CLAUDE.md / GEMINI.md / Cursor rule into a **local** folder; never commits | |
 | `test/hub.test.mjs` | End-to-end `node:test` suite: starts the fake GitHub and the hub as child processes, drives REST and MCP | |
 | `test/mock-google.mjs` | Fake Google token endpoint and Docs API; verifies the JWT signature and keeps the Doc text in memory (`GET /_doc`) | |
+| `test/fake-cloudflared.mjs` | Fake `cloudflared` (`CLOUDFLARED_BIN` in the tests): prints a random quick-tunnel address, or registers a named tunnel only with the test token from the environment | |
 | `test/mock-github.mjs` | Fake GitHub API (Express) with fixed repos, commits and PRs; token must be `ghtest`. `POST`/`DELETE /_fail/<repo>` makes a repo's commits fail (tests for sync errors) | |
 | `docs/` | This guide, `CONNECT_APPS.md` (connecting each AI app), `SELF_HOSTING.md` (Docker, tunnels, VPS, backups), `HANDOFF_PLAN.md` (continue-anywhere design), `images/` (README screenshots from demo mode) | |
 | `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/dependabot.yml`, `.github/workflows/codeql.yml` | Community files: how to develop and release, private vulnerability reporting, templates, dependency updates, code scanning | |
-| `Dockerfile`, `docker-compose.yml`, `docker/` | Container image (non-root, health check) and compose file with optional tunnel profiles (`quick-tunnel`, `tailscale`) | |
+| `Dockerfile`, `docker-compose.yml`, `docker/` | Container image (non-root, health check, `cloudflared` pinned by version and SHA-256, CA certificates) and compose file with optional tunnel profiles (`quick-tunnel`, `tailscale`) | |
 | `.github/workflows/docker.yml` | On a version tag: multi-arch image to GitHub Container Registry | |
 | `.mcp.json` | Connects Claude Code in this folder to the local hub (`${HUB_TOKEN}` from the shell) | |
 | `CLAUDE.md`, `TODO.md` | Rules for agents working on this repo; roadmap | |
@@ -330,6 +332,7 @@ Details:
 - Rate limits (`src/ratelimit.js`, in memory, reset on restart; `0` turns one off):
   - **Failed logins:** `LOGIN_MAX_FAILS` (10) per IP and `LOGIN_MAX_FAILS_TOTAL` (50) in total per 15 minutes. Checked before the password, so a guess while blocked reveals nothing; the login page says to wait. Browsers already signed in are unaffected.
   - **Wrong tokens or cookies** on `/api`, `/mcp` and `/mcp/k/:token`: `BAD_TOKEN_MAX` (30) per IP per 15 minutes, then `429` with `Retry-After`. A valid token is never refused by this, so guessing from a shared IP can't lock the real apps out.
+  - **Tunnel actions** (`PUT /api/tunnel`, `POST /api/tunnel/check`, which start `cloudflared` or call out to the internet): `TUNNEL_ACTIONS_PER_MINUTE` (10) per caller.
   - **Requests per caller** (connection slug, `shared-token` or `web`, not IP): `RATE_LIMIT_PER_MINUTE` (600), then `429`. Stops one runaway agent from flooding the hub.
   - The client IP comes from `X-Forwarded-For` only when the connection is from a trusted proxy (`TRUST_PROXY`, default `loopback`: Tailscale Funnel, cloudflared, Caddy on the same machine), so clients can't fake it.
 - The session cookie is stateless: `HMAC-SHA256(ADMIN_PASSWORD, 'ui-session:' + HUB_TOKEN)` with `.env` secrets, or `HMAC-SHA256(session_secret, 'ui-session:' + password hash)` after the setup page, `HttpOnly`, `SameSite=Lax`, 30 days, `Secure` behind HTTPS. Changing either secret signs everyone out.
@@ -339,6 +342,7 @@ Details:
 - GitHub is read-only: only `GET` requests; the token needs read scopes only.
 - User data (commit messages, PR titles, entry text) is escaped in the UI with `esc()`, including in the Markdown preview, and is never treated as instructions.
 - `/mcp` allows CORS from any origin (auth is still required).
+- **Public access** (`src/tunnel.js`, Settings → Public access): `cloudflared` runs as a child process of the hub (inside the container in Docker) and forwards to `http://127.0.0.1:<PORT>`, so it is a loopback proxy: HTTPS and the client IP are trusted from it and the rate limits apply per real client. The whole hub becomes reachable (login, setup and token-protected routes; nothing new is exposed without auth). The routes are admin/web only (`/api/tunnel`, never connection tokens). A Cloudflare Tunnel token is write-only: stored in `kv` like the GitHub token, passed to `cloudflared` as `TUNNEL_TOKEN` in its environment (never on the command line, where other users could read it), and never returned. The child gets only `PATH`, `HOME` and that token, not the hub's environment. While the tunnel runs, its address is the public URL (`baseUrl()`), so new connection links use it; a `PUBLIC_URL` pointing to `localhost` no longer wins over the request's own address. The Docker image downloads `cloudflared` from Cloudflare's GitHub release at build time and refuses it unless the SHA-256 matches the pinned value.
 - Google Doc mirror: on a Google Cloud VM it can be keyless: the VM runs as a dedicated service account with only the `documents` scope, which can edit only Docs shared with it (and replaces the default compute account's broad rights). If a key file is used instead (`google-sa.json`, git- and docker-ignored, `chmod 600`), it has the same limits. The Doc never contains private entries. Anyone the Doc is shared with can read everything public in the hub, so keep it shared with yourself and the service account only.
 
 ## 7. Configuration
@@ -357,7 +361,11 @@ Details:
 | `AUTO_SYNC_HOURS` | 0 | Older, coarser interval |
 | `INCLUDE_FORKS` | false | Sync forks too |
 | `TIMEZONE` | UTC (setup page / Settings tab) | Activity-log dates (IANA name) |
-| `PUBLIC_URL` | empty: the address the request came in on | Base URL in Apps-tab snippets, `/connect.sh` and repo files. Set it if the hub is reached through a proxy elsewhere |
+| `PUBLIC_URL` | empty: the address the request came in on | Base URL in Apps-tab snippets, `/connect.sh` and repo files. Set it if the hub is reached through a proxy elsewhere. The built-in tunnel's address wins while it runs; a `localhost` value is ignored in favour of the request's address |
+| `TUNNEL` | empty: Settings → Public access | `quick`, `cloudflare` or `off`. Set here, the UI can't change it |
+| `CLOUDFLARE_TUNNEL_TOKEN`, `TUNNEL_HOSTNAME` | empty (Settings) | For `TUNNEL=cloudflare`: the tunnel token and the hostname routed to `localhost:<PORT>` |
+| `CLOUDFLARED_BIN` | `cloudflared` on `PATH` (`/usr/local/bin/cloudflared` in Docker) | Path to the binary; the tests point it at a fake |
+| `TUNNEL_CHECK_TRIES` | 12 (about 5 minutes) | Reachability checks after a new address (tests use 1) |
 | `PORT` | 8787 | HTTP port |
 | `OWNER_NAME` | empty (Settings tab) | Your name in the bundle heading and repo files |
 | `DATA_DIR` | `./data` (`/data` in Docker) | Where `hub.db` lives |
@@ -369,6 +377,7 @@ Details:
 | `LOGIN_MAX_FAILS` / `LOGIN_MAX_FAILS_TOTAL` | 10 / 50 | Failed logins per IP / in total per 15 min (0 = off) |
 | `BAD_TOKEN_MAX` | 30 | Wrong tokens per IP per 15 min before `429` (0 = off) |
 | `RATE_LIMIT_PER_MINUTE` | 600 | Requests per minute per app (0 = off) |
+| `TUNNEL_ACTIONS_PER_MINUTE` | 10 | Tunnel start/stop and reachability checks per caller per minute (0 = off) |
 
 ## 8. Testing
 
@@ -439,6 +448,7 @@ Principles that stay: business logic only in `context.js` (and a future `tasks.j
 
 ## 13. Change log
 
+- **2026-11-05:** Public access built in: `src/tunnel.js` (cloudflared quick tunnel or Cloudflare Tunnel token), routes `GET/PUT /api/tunnel`, `POST /api/tunnel/check`, `POST /api/tunnel/ack`, `tunnel` and `publicUrlLocal` in `/api/status`, Settings card, Apps-tab and Overview warnings for `localhost`, `cloudflared` and CA certificates in the image, config `TUNNEL`, `CLOUDFLARE_TUNNEL_TOKEN`, `TUNNEL_HOSTNAME`, `CLOUDFLARED_BIN`; `baseUrl()` prefers the tunnel and ignores a local `PUBLIC_URL`.
 - **2026-11-05:** Tasks: `checkpoint_task` by a non-owner records the handoff (`resumed`); checkpoint commits must be hashes.
 - **2026-11-04:** v1.0.1: `repoParam()` validation and `nosniff` (CodeQL findings).
 - **2026-11-04:** v1.0.0, first public version (see `CHANGELOG.md`).

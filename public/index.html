@@ -14,6 +14,7 @@
     <span class="muted" id="lastSync">Last sync: —</span>
     <button class="link" id="connectGh" data-goto="settings" hidden>Connect GitHub</button>
     <button class="link bad" id="syncErr" data-goto="activity" hidden></button>
+    <button class="link bad" id="tunnelNote" data-goto="settings" hidden></button>
     <button id="syncBtn">Sync GitHub</button>
     <form method="post" action="/logout"><button class="ghost" type="submit">Sign out</button></form>
   </div>
@@ -184,6 +185,7 @@
     <div class="split">
       <div class="card main-col">
         <h2>Apps and accounts</h2>
+        <p class="warn local-warn" hidden>ChatGPT, Claude and Gemini on the web can't reach <code class="local-url"></code>. Turn on <button class="link" data-goto="settings">Settings → Public access</button> first, then add them. Apps on this computer work as is.</p>
         <p class="muted">Each app and account gets its own token, so the hub knows exactly who changed what, and you can rotate or revoke one without touching the others. You connect each app <strong>once</strong>; it then works in every project. <a href="https://github.com/darshanbajgain/keepcontext/blob/main/docs/CONNECT_APPS.md" target="_blank" rel="noopener noreferrer">Step-by-step guide</a></p>
         <div id="appsList"></div>
       </div>
@@ -201,6 +203,7 @@
     <div class="card token-card" id="tokenCard" hidden>
       <div class="row between"><h2 id="tokenTitle">Token</h2><button type="button" class="ghost sm" id="tokenDone">Done, hide it</button></div>
       <p class="warn">Copy this now: it is shown only once. Don't paste it into chats; put it straight into the app.</p>
+      <p class="warn local-warn" hidden>This link starts with <code class="local-url"></code>, which web apps can't reach. For ChatGPT, Claude or Gemini on the web, turn on <button class="link" data-goto="settings">Settings → Public access</button>, then rotate this connection for a public link.</p>
       <div id="tokenSetup"></div>
     </div>
     <div class="card">
@@ -225,6 +228,26 @@
   </section>
   <!-- SETTINGS -->
   <section id="tab-settings" class="tab" hidden>
+    <div class="card" id="tunnelCard">
+      <h2>Public access <span class="muted small">(for ChatGPT, Claude and Gemini on the web)</span></h2>
+      <div id="tunnelState"></div>
+      <p class="muted">Web apps connect from their own servers, so they need a public HTTPS address. Apps on this computer (Claude Code, Codex, Cursor, Copilot, Gemini CLI) work with <code>localhost</code> and don't need this.</p>
+      <form id="tunnelForm">
+        <div class="tunnel-modes">
+          <label class="check"><input type="radio" name="mode" value="quick"> <span><strong>Quick tunnel</strong>: free, no account, ready in seconds. The address changes when KeepContext restarts; then you update it in your web apps.</span></label>
+          <label class="check"><input type="radio" name="mode" value="cloudflare"> <span><strong>Cloudflare tunnel, fixed address</strong>: a free Cloudflare account and your own domain. <a href="https://github.com/darshanbajgain/keepcontext/blob/main/docs/SELF_HOSTING.md#cloudflare-tunnel-with-your-domain" target="_blank" rel="noopener noreferrer">How to get a token</a></span></label>
+          <div id="cfFields" class="cf-fields" hidden>
+            <label>Tunnel token <input name="token" type="password" autocomplete="off" placeholder="eyJh…"></label>
+            <label>Public hostname <input name="hostname" autocomplete="off" placeholder="keepcontext.example.com"></label>
+          </div>
+          <label class="check"><input type="radio" name="mode" value="off"> <span><strong>Off</strong>: local only</span></label>
+        </div>
+        <div class="row"><button type="submit">Save</button><button type="button" class="ghost" id="tunnelCheck" hidden>Test again</button></div>
+      </form>
+      <p class="muted small" id="tunnelMissing" hidden><code>cloudflared</code> isn't installed here. The Docker image includes it; without Docker, <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">install cloudflared</a> and restart KeepContext.</p>
+      <p class="muted small" id="tunnelEnv" hidden>Set with <code>TUNNEL</code> in <code>.env</code>; change it there.</p>
+      <p class="muted small">Other ways to a fixed address: Tailscale Funnel (free, no domain needed) or your own reverse proxy. See the <a href="https://github.com/darshanbajgain/keepcontext/blob/main/docs/SELF_HOSTING.md#public-https" target="_blank" rel="noopener noreferrer">self-hosting guide</a>.</p>
+    </div>
     <div class="grid2">
       <form class="card" id="profileForm">
         <h2>Profile</h2>

@@ -4,6 +4,11 @@ All notable changes to KeepContext. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **Public access, built in:** Settings → Public access gives KeepContext a public HTTPS address so ChatGPT, Claude and Gemini on the web can connect (they can't reach `localhost`). One click starts a free Cloudflare quick tunnel (no account); for a fixed address, paste a Cloudflare Tunnel token and your hostname. The hub checks the address from the internet, uses it in every connection link, starts the tunnel again with the server, and warns when a quick-tunnel address changes. The Docker image now includes `cloudflared` (pinned, checksum-verified). Also settable with `TUNNEL`, `CLOUDFLARE_TUNNEL_TOKEN` and `TUNNEL_HOSTNAME`.
+- The Apps tab and the Overview's first steps warn when the hub's address is `localhost`, which web apps can't reach.
+
 ### Changed
 
 - The Docker image runs on Node 26 (current LTS); CI tests Node 22, 24 and 26.

@@ -33,14 +33,15 @@ Want to look around first? `docker run --rm -p 8787:8787 -e DEMO=1 ghcr.io/darsh
 
 ### Reach it from ChatGPT, Claude and Gemini on the web
 
-Web apps need a public HTTPS address. The [compose file](docker-compose.yml) has two built-in options:
+Web apps connect from their own servers, so they can't reach `localhost`: KeepContext needs a public HTTPS address. It's built in: open **Settings → Public access**.
 
-| Command | Address | Good for |
+| Option | Address | Good for |
 | --- | --- | --- |
-| `docker compose --profile quick-tunnel up -d` | `https://….trycloudflare.com` (in `docker compose logs quick-tunnel`), **changes on every restart** | Trying it out, no account needed |
-| `docker compose --profile tailscale up -d` | a fixed `https://keepcontext.<your-tailnet>.ts.net` | Everyday use. Free [Tailscale](https://tailscale.com) account; put `TS_AUTHKEY` in `.env` and [allow Funnel](https://tailscale.com/kb/1223/funnel) in your tailnet |
+| **Quick tunnel** (one click) | `https://….trycloudflare.com`, **changes when KeepContext restarts** | Trying it out. No account needed |
+| **Cloudflare tunnel** (paste a token) | a fixed address on your own domain | Everyday use. Free Cloudflare account and a domain ([how](docs/SELF_HOSTING.md#cloudflare-tunnel-with-your-domain)) |
+| Tailscale Funnel (`docker compose --profile tailscale up -d`) | a fixed `https://keepcontext.<your-tailnet>.ts.net` | Everyday use without a domain. Free [Tailscale](https://tailscale.com) account |
 
-Or put it behind your own domain with Caddy or Nginx ([self-hosting guide](docs/SELF_HOSTING.md)). Coding apps on the same machine work with plain `http://localhost:8787`.
+KeepContext checks the address from the internet and uses it in every connection link. Coding apps on the same machine keep using `http://localhost:8787`. More options (Caddy, Nginx, a VPS): [self-hosting guide](docs/SELF_HOSTING.md).
 
 ### Without Docker
 
