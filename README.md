@@ -69,7 +69,7 @@ In the **Apps** tab, **Add a connection** for each app (and account). It shows t
 
 | App | How |
 | --- | --- |
-| **ChatGPT** | **Plugins** (left sidebar) → add your own plugin with the secret URL, no authentication → **Allow all tools**. Works on the free plan. |
+| **ChatGPT** | **Plugins** (left sidebar) → **Add** → **Add custom MCP server** → Server URL = the secret URL, **No authentication** → then set it to **Allow all tools**. Works on the free plan. |
 | **Claude** (web, desktop, mobile) | Settings → Connectors → Add custom connector → the secret URL |
 | **Gemini** | Customise → Connectors → Custom → the secret URL |
 | **Claude Code, Codex, Cursor, Copilot, Gemini CLI, Antigravity** | One command in any terminal: `curl -fsSL https://YOUR-HUB/connect.sh \| bash -s codex` (or `claude-code`, `cursor`, `copilot`, `gemini-cli`, `antigravity`), then paste the token |
