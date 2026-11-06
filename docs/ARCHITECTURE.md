@@ -448,6 +448,7 @@ Principles that stay: business logic only in `context.js` (and a future `tasks.j
 
 ## 13. Change log
 
+- **2026-11-06:** v1.1.0 released (Public access, task handoff fixes, Node 26 image).
 - **2026-11-05:** Public access built in: `src/tunnel.js` (cloudflared quick tunnel or Cloudflare Tunnel token), routes `GET/PUT /api/tunnel`, `POST /api/tunnel/check`, `POST /api/tunnel/ack`, `tunnel` and `publicUrlLocal` in `/api/status`, Settings card, Apps-tab and Overview warnings for `localhost`, `cloudflared` and CA certificates in the image, config `TUNNEL`, `CLOUDFLARE_TUNNEL_TOKEN`, `TUNNEL_HOSTNAME`, `CLOUDFLARED_BIN`; `baseUrl()` prefers the tunnel and ignores a local `PUBLIC_URL`.
 - **2026-11-05:** Tasks: `checkpoint_task` by a non-owner records the handoff (`resumed`); checkpoint commits must be hashes.
 - **2026-11-04:** v1.0.1: `repoParam()` validation and `nosniff` (CodeQL findings).

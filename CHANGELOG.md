@@ -4,6 +4,8 @@ All notable changes to KeepContext. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-06
+
 ### Added
 
 - **Public access, built in:** Settings → Public access gives KeepContext a public HTTPS address so ChatGPT, Claude and Gemini on the web can connect (they can't reach `localhost`). One click starts a free Cloudflare quick tunnel (no account); for a fixed address, paste a Cloudflare Tunnel token and your hostname. The hub checks the address from the internet, uses it in every connection link, starts the tunnel again with the server, and warns when a quick-tunnel address changes. The Docker image now includes `cloudflared` (pinned, checksum-verified). Also settable with `TUNNEL`, `CLOUDFLARE_TUNNEL_TOKEN` and `TUNNEL_HOSTNAME`.
@@ -51,6 +53,7 @@ First public version: one self-hosted memory for every AI app, with tasks any ap
 
 - Dependencies updated: body-parser (high) and fast-uri (moderate) advisories fixed.
 
-[Unreleased]: https://github.com/darshanbajgain/keepcontext/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/darshanbajgain/keepcontext/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/darshanbajgain/keepcontext/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/darshanbajgain/keepcontext/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/darshanbajgain/keepcontext/releases/tag/v1.0.0
