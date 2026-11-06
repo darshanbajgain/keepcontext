@@ -6,6 +6,22 @@
 
 KeepContext is a small server with a web dashboard and one [MCP](https://modelcontextprotocol.io) endpoint. ChatGPT, Claude (web, desktop, Claude Code), Gemini (web, CLI), Cursor, Codex, GitHub Copilot and Antigravity all connect to it. Your data stays on your machine or server.
 
+**Built for students, researchers and developers**: anyone whose work is spread across several AI tools and who wants every one of them to know the same ideas, todos and project status.
+
+[![KeepContext demo video: setup, saving an idea in ChatGPT, Claude already knowing it, and a coding task handed from Claude Code to Copilot](https://img.youtube.com/vi/2RkaAdRqNhY/maxresdefault.jpg)](https://youtu.be/2RkaAdRqNhY)
+
+▶ **[Watch the 2½-minute demo](https://youtu.be/2RkaAdRqNhY)**: setup with Docker, public access for web apps, GitHub, saving an idea in ChatGPT that Claude already knows, and a coding task that Copilot continues after Claude Code hits its limit.
+
+## Who it's for
+
+| | What KeepContext keeps for you | Example |
+| --- | --- | --- |
+| 🎓 **Students** | Course notes, study plans, deadlines and todos, the same in every AI app | Plan your week in ChatGPT, then ask Claude what's due on Friday |
+| 🔬 **Researchers** | Hypotheses, reading notes, experiment decisions and open questions | Save a paper idea in one chat; any assistant can recall it and build on it later |
+| 💻 **Developers** | Project decisions, coding rules, GitHub progress, and multi-step tasks | Claude Code hits its usage limit mid-task; Codex, Cursor or Copilot continues from the last checkpoint |
+
+Wherever you are and whichever AI you open, it starts from the same context: your current projects, open todos, recent decisions and what changed today.
+
 ![Overview: counts, pinned items, which apps changed what, active tasks](docs/images/overview.png)
 
 ## What it does
@@ -122,6 +138,8 @@ Nothing is required. The setup page and the **Settings** tab cover the password,
 **Does it work on the ChatGPT free plan?** Yes, as a custom plugin (checked November 2026). Set the plugin to "Allow all tools", or ChatGPT asks before every save.
 
 **Can I run it on a Raspberry Pi?** Yes. The image is published for arm64 too.
+
+**I'm not a developer. Is it for me?** Yes, if you can run one Docker command. Students and researchers use the same ideas, notes, todos and decisions; tasks and GitHub are optional extras.
 
 **How is this different from each app's own memory?** Each app's memory stays inside that app. KeepContext is one memory that every app reads and writes, on your own server, and it can hand a task from one app to another.
 
