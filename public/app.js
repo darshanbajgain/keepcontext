@@ -578,7 +578,7 @@ function loadConnect() {
   const items = [
     ['Claude Code (terminal, VS Code, JetBrains)', 'Run once in a terminal:', `claude mcp add --transport http --scope user keepcontext ${url} \\\n  --header "Authorization: Bearer HUB_TOKEN"`],
     ['Claude app (claude.ai, desktop, mobile)', 'Settings → Connectors → Add custom connector → name KeepContext → paste the secret URL → No sign-in. (Or the /mcp URL plus a request header "Authorization: Bearer HUB_TOKEN", which also allows include_private.)', secret],
-    ['ChatGPT', 'Plugins (left sidebar) → add your own plugin: paste the secret URL, no authentication. Then set the plugin to "Allow all tools" so saving doesn\'t ask every time. Works on the free plan.', secret],
+    ['ChatGPT', 'Plugins (left sidebar) → Add (top right) → Add custom MCP server: Connection "Server URL" = the secret URL, Authentication "No authentication", tick "I understand…", add it. Then set the plugin to "Allow all tools" so saving doesn\'t ask every time. Works on the free plan.', secret],
     ['Gemini (web)', 'Customise → Connectors → + Custom → paste the secret URL → Next. Gemini can also read the Google Doc mirror (Gems → Knowledge).', secret],
     ['Cursor', '~/.cursor/mcp.json (all projects) or .cursor/mcp.json in a repo:', JSON.stringify({ mcpServers: { 'keepcontext': { url, headers: { Authorization: 'Bearer HUB_TOKEN' } } } }, null, 2)],
     ['Antigravity', 'Agent panel → … → MCP Servers → Manage → View raw config (the file is ~/.gemini/antigravity/mcp_config.json). The app does not read shell variables, so put the token itself in the header and keep the file private (chmod 600):', JSON.stringify({ mcpServers: { 'keepcontext': { serverUrl: url, headers: { Authorization: 'Bearer HUB_TOKEN' } } } }, null, 2)],
@@ -632,7 +632,7 @@ function setupFor(app, token) {
   // Works from any terminal: the hub serves the helper; it asks for the token (hidden) and edits that app's config once.
   const local = (name) => `curl -fsSL ${status.publicUrl}/connect.sh | bash -s ${name}`;
   const S = {
-    chatgpt: [['ChatGPT', 'Plugins (left sidebar) → add your own plugin. Name: KeepContext. URL: this. No authentication. Then set it to "Allow all tools".', secret]],
+    chatgpt: [['ChatGPT', 'Plugins (left sidebar) → Add (top right) → Add custom MCP server. Name: KeepContext. Connection: Server URL = this. Authentication: No authentication. Tick "I understand…", add it, then set it to "Allow all tools".', secret]],
     'claude-web': [['Claude (web, desktop, mobile)', 'Settings → Connectors → Add custom connector → Name: KeepContext → URL: this → Authentication: No sign-in, no headers.', secret],
       ['Or, with private access', `URL ${url} plus request header "Authorization" with this value (needs "Allow private entries").`, header]],
     'gemini-web': [['Gemini', 'Customise → Connectors → + Custom → paste this URL → Next.', secret]],

@@ -4,6 +4,10 @@ All notable changes to KeepContext. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Changed
+
+- ChatGPT setup steps match ChatGPT's current screens: Plugins → Add → **Add custom MCP server** (Server URL, No authentication), then Allow all tools.
+
 ## [1.1.0] - 2026-11-06
 
 ### Added
